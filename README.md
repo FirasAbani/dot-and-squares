@@ -27,4 +27,5 @@ Notes:
 - Keep `src/` organized by feature or by layer, whichever the team prefers, but stay consistent.
 - Colocate tests next to source files (`Component.test.ts` beside `Component.ts`) or mirror the structure under `tests/` — pick one convention.
 - Add a `.env.example` to document required environment variables without committing secrets.
+CLosing
 
