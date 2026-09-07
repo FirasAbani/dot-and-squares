@@ -261,7 +261,7 @@ the upgrade and bumped on any incompatible change.
 - **Client →** `move` (carrying the last applied `seq`), `resign`, `offer-draw`,
   `respond-draw`, `rematch`, `resync`, `leave`
 - **Server →** `welcome`, `state` (with `seq`, `reason`, `series`), `presence`, `rematch`,
-  `draw-offered`, `draw-declined`, `rejected`, `error`
+  `draw-offered`, `draw-declined`, `rematch-timeout`, `rejected`, `error`
 
 The lobby socket is separate, anonymous and read-only — it carries no token and no seat:
 
@@ -531,7 +531,7 @@ with pre-change code — so the symptom looks like edits not taking effect, not 
 
 ## 9. Verification
 
-The suite that must exist and pass. Current totals: **252 unit tests** across eleven files.
+The suite that must exist and pass. Current totals: **260 unit tests** across eleven files.
 
 | Layer | Coverage required |
 | --- | --- |
@@ -649,6 +649,11 @@ rules to be rewritten when the server needs them.
 18. The server validates room codes against the real alphabet, so a confusable code cannot
     open a different room.
 19. A game is dealt only when both players are connected, never merely both seats claimed.
-20. Every terminal connection state must be nameable on screen. A failed connect that renders
+20. **An offer nobody can answer must expire.** A rematch offered to a player who has
+    already closed their browser used to wait for ever — the votes were recorded, nothing
+    was ever broadcast back, and the offerer watched a screen that could never change. An
+    unanswered rematch now carries a 5-second deadline on the room's single alarm; when it
+    passes, both sides are told and returned to the start.
+21. Every terminal connection state must be nameable on screen. A failed connect that renders
     the same spinner as a slow one is a hang as far as the player is concerned, and a connect
     with no timeout can spin for ever on nothing.

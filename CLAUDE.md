@@ -28,7 +28,7 @@ to the app so a prefetch can't kill the game.
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Dev server at http://localhost:5173 |
-| `npm test` | 252 tests: `client` (jsdom) + `worker` (node) projects |
+| `npm test` | 260 tests: `client` (jsdom) + `worker` (node) projects |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run build` | Typecheck (client + worker) + build to `dist/` |
 | `npm run dev:worker` | wrangler on :8787 — real Durable Objects, local SQLite |

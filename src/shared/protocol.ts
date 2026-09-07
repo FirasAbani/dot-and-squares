@@ -64,6 +64,12 @@ export type ServerMessage =
   | { t: 'rematch'; votes: RematchVotes }
   | { t: 'draw-offered'; by: PlayerId }
   | { t: 'draw-declined'; by: PlayerId }
+  /**
+   * Nobody answered a rematch offer in time. Additive on the wire: an older
+   * client simply ignores a type it does not know, so this needs no version
+   * bump and cannot break a game in progress.
+   */
+  | { t: 'rematch-timeout' }
   | { t: 'rejected'; reason: RejectionReason }
   | { t: 'error'; code: 'room-closed' | 'bad-message'; message: string };
 

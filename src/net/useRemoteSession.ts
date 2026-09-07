@@ -24,6 +24,8 @@ export interface RemoteSession {
   rematchVotes: RematchVotes;
   drawOfferedBy: PlayerId | null;
   drawDeclined: boolean;
+  /** Set when a rematch offer expired unanswered; the match is over. */
+  rematchExpired: boolean;
   series: Series | null;
   failure: JoinFailure | null;
   notice: RejectionReason | null;
@@ -67,6 +69,7 @@ export function useRemoteSession(): RemoteSession {
   const [rematchVotes, setRematchVotes] = useState<RematchVotes>({ p1: false, p2: false });
   const [drawOfferedBy, setDrawOfferedBy] = useState<PlayerId | null>(null);
   const [drawDeclined, setDrawDeclined] = useState(false);
+  const [rematchExpired, setRematchExpired] = useState(false);
   const [series, setSeries] = useState<Series | null>(null);
   const [failure, setFailure] = useState<JoinFailure | null>(null);
   const [notice, setNotice] = useState<RejectionReason | null>(null);
@@ -119,6 +122,10 @@ export function useRemoteSession(): RemoteSession {
         break;
       case 'rematch':
         setRematchVotes(msg.votes);
+        break;
+      case 'rematch-timeout':
+        setRematchVotes({ p1: false, p2: false });
+        setRematchExpired(true);
         break;
       case 'draw-offered':
         setDrawOfferedBy(msg.by);
@@ -268,6 +275,7 @@ export function useRemoteSession(): RemoteSession {
     setSeat(null);
     setCode(null);
     setPresence(null);
+    setRematchExpired(false);
     // Otherwise the next screen renders the error from the session just ended.
     setFailure(null);
   }, [send]);
@@ -291,6 +299,7 @@ export function useRemoteSession(): RemoteSession {
     rematchVotes,
     drawOfferedBy,
     drawDeclined,
+    rematchExpired,
     series,
     failure,
     notice,

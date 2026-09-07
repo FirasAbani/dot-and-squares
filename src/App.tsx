@@ -121,6 +121,8 @@ export default function App() {
    * first — which is what "nothing happened" felt like.
    */
   const [deadCodes, setDeadCodes] = useState<string[]>([]);
+  /** Explains, back on the setup screen, why a match ended without a rematch. */
+  const [matchEndedNotice, setMatchEndedNotice] = useState<string | null>(null);
   const [hosting, setHosting] = useState(true);
   const [joiningHost, setJoiningHost] = useState<string | null>(null);
   const [quitPhase, setQuitPhase] = useState<QuitPhase>('idle');
@@ -421,6 +423,7 @@ export default function App() {
       primeAudio();
       setSavedPlayers((current) => ({ one: player, two: current?.two ?? { username: 'Player 2', initials: 'P2' } }));
       savePlayers(player, savedPlayers?.two ?? { username: 'Player 2', initials: 'P2' });
+      setMatchEndedNotice(null);
       setOnline(true);
       setHosting(true);
       setJoiningHost(null);
@@ -442,12 +445,27 @@ export default function App() {
       primeAudio();
       setSavedPlayers((current) => ({ one: player, two: current?.two ?? { username: 'Player 2', initials: 'P2' } }));
       savePlayers(player, savedPlayers?.two ?? { username: 'Player 2', initials: 'P2' });
+      setMatchEndedNotice(null);
       setOnline(true);
       setHosting(false);
       remote.connect({ code, player, create: false });
     },
     [remote],
   );
+
+  /**
+   * A rematch offer that expired. Both players are returned to the start —
+   * there is nothing left to wait for, and the alternative is a screen that
+   * never changes.
+   */
+  useEffect(() => {
+    if (!remote.rematchExpired) return;
+    setMatchEndedNotice('The other player did not answer — the match has ended.');
+    remote.disconnect();
+    setOnline(false);
+    setState(null);
+    setMatch(null);
+  }, [remote.rematchExpired, remote]);
 
   // A join that landed. Without this the browse screen is still armed behind
   // the game, and leaving it later drops the player onto a dead lobby.
@@ -629,8 +647,14 @@ export default function App() {
           onJoinRoom={joinRoom}
           onBrowseLobby={browseLobby}
           initialCode={linkedRoom}
-          initialMode={browsePlayer ? 'online' : undefined}
-          joinError={remote.failure ? (JOIN_ERRORS[remote.failure] ?? 'Could not join.') : null}
+          // Someone sent back from an online match belongs on the online tab,
+          // not dropped into pass-and-play holding an explanation about a
+          // player who is not there.
+          initialMode={browsePlayer || matchEndedNotice ? 'online' : undefined}
+          joinError={
+            matchEndedNotice ??
+            (remote.failure ? (JOIN_ERRORS[remote.failure] ?? 'Could not join.') : null)
+          }
         />
         {/* Only offered when it can actually do something. In a deployed build
             this button means "leave the game", and on the setup screen there is

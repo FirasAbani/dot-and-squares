@@ -9,6 +9,7 @@ import {
   nextAlarmAt,
   presenceOf,
   reduceRoom,
+  REMATCH_TIMEOUT_MS,
   RENEW_LISTING_MS,
   roomInfo,
   type RoomState,
@@ -708,5 +709,72 @@ describe('a room whose host has vanished', () => {
     const created = seat(emptyRoom('ABC234', 0), ada, true);
     const joined = seat(created.room, grace);
     expect(joined.room.game?.status).toBe('playing');
+  });
+});
+
+describe('a rematch nobody answers', () => {
+  /** A finished game, so a rematch can be offered. */
+  function finished() {
+    const room = started();
+    return reduceRoom(room, { k: 'message', seat: 'p1', msg: { t: 'resign' }, now: 2000 }).room;
+  }
+
+  it('gives the offer a deadline instead of waiting for ever', () => {
+    const offered = send(finished(), 'p2', { t: 'rematch', want: true });
+    expect(offered.room.meta.rematchDeadline).toBe(2000 + REMATCH_TIMEOUT_MS);
+    expect(nextAlarmAt(offered.room)).toBe(2000 + REMATCH_TIMEOUT_MS);
+  });
+
+  it('tells both players when the offer runs out', () => {
+    const offered = send(finished(), 'p2', { t: 'rematch', want: true });
+    const timedOut = reduceRoom(offered.room, {
+      k: 'alarm',
+      now: 2000 + REMATCH_TIMEOUT_MS,
+    });
+    expect(timedOut.effects).toEqual([{ to: 'all', msg: { t: 'rematch-timeout' } }]);
+  });
+
+  it('clears the votes, so the screen cannot claim an offer is still live', () => {
+    const offered = send(finished(), 'p2', { t: 'rematch', want: true });
+    const timedOut = reduceRoom(offered.room, { k: 'alarm', now: 2000 + REMATCH_TIMEOUT_MS });
+    expect(timedOut.room.meta.rematch).toEqual({ p1: false, p2: false });
+    expect(timedOut.room.meta.rematchDeadline).toBeNull();
+  });
+
+  it('says nothing while the offer is still young', () => {
+    const offered = send(finished(), 'p2', { t: 'rematch', want: true });
+    const early = reduceRoom(offered.room, { k: 'alarm', now: 2000 + 1000 });
+    expect(early.effects).toEqual([]);
+  });
+
+  it('starts the game instead when the other player answers in time', () => {
+    const offered = send(finished(), 'p2', { t: 'rematch', want: true });
+    const accepted = reduceRoom(offered.room, {
+      k: 'message',
+      seat: 'p1',
+      msg: { t: 'rematch', want: true },
+      now: 2000 + 1000,
+    });
+    expect(accepted.room.game?.status).toBe('playing');
+    expect(accepted.room.meta.rematchDeadline).toBeNull();
+  });
+
+  it('drops the deadline when the offer is withdrawn', () => {
+    const offered = send(finished(), 'p2', { t: 'rematch', want: true });
+    const withdrawn = reduceRoom(offered.room, {
+      k: 'message',
+      seat: 'p2',
+      msg: { t: 'rematch', want: false },
+      now: 2500,
+    });
+    expect(withdrawn.room.meta.rematchDeadline).toBeNull();
+  });
+
+  it('still times out when the opponent has already left the room', () => {
+    const done = finished();
+    const gone = reduceRoom(done, { k: 'disconnect', seat: 'p1', now: 2000 }).room;
+    const offered = send(gone, 'p2', { t: 'rematch', want: true });
+    const timedOut = reduceRoom(offered.room, { k: 'alarm', now: 2000 + REMATCH_TIMEOUT_MS });
+    expect(timedOut.effects).toEqual([{ to: 'all', msg: { t: 'rematch-timeout' } }]);
   });
 });

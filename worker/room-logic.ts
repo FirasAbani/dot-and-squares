@@ -46,6 +46,8 @@ export interface RoomMeta {
   seats: Record<PlayerId, SeatRecord | null>;
   seq: number;
   rematch: RematchVotes;
+  /** When an unanswered rematch offer gives up. Null when none is pending. */
+  rematchDeadline: number | null;
   drawOfferedBy: PlayerId | null;
   gridSize: number;
   timeControlMs: number | null;
@@ -103,6 +105,7 @@ export function emptyRoom(code: string, now: number): RoomState {
       seats: { p1: null, p2: null },
       seq: 0,
       rematch: { p1: false, p2: false },
+      rematchDeadline: null,
       drawOfferedBy: null,
       gridSize: 10,
       timeControlMs: null,
@@ -352,6 +355,12 @@ export interface ReduceResult {
 
 const IDLE_REAP_MS = 24 * 60 * 60 * 1000;
 /**
+ * How long an offered rematch waits for an answer. Short on purpose: the case
+ * it exists for is an opponent who has already closed their browser, where
+ * anything longer is just a player staring at a dead screen.
+ */
+export const REMATCH_TIMEOUT_MS = 5000;
+/**
  * How often a listed room re-announces itself. Comfortably inside the lobby's
  * 15-minute listing TTL, so a waiting host never expires off the list, and a
  * `list` that failed to land gets another chance without any retry machinery.
@@ -381,6 +390,22 @@ export function reduceRoom(room: RoomState, event: RoomEvent): ReduceResult {
     if (room.game && room.game.status === 'playing' && hasFlagged(room.game, event.now)) {
       return advance(room, flagPlayer(room.game, room.game.currentPlayer), 'move');
     }
+    // An offered rematch that nobody answered. Say so and clear it, rather
+    // than leaving a player watching a screen that will never change.
+    if (room.meta.rematchDeadline !== null && event.now >= room.meta.rematchDeadline) {
+      return {
+        room: {
+          ...room,
+          meta: {
+            ...room.meta,
+            rematch: { p1: false, p2: false },
+            rematchDeadline: null,
+          },
+        },
+        effects: [{ to: 'all', msg: { t: 'rematch-timeout' } }],
+      };
+    }
+
     // A room still waiting for an opponent renews its listing rather than
     // letting the lobby's TTL quietly drop it.
     //
@@ -506,15 +531,31 @@ function handleMessage(
       const p2 = room.meta.seats.p2;
 
       if (!bothWant || !p1 || !p2) {
+        // Someone is now waiting on an answer that may never come — the
+        // opponent may have closed their browser after the last game. Give the
+        // offer a deadline so the wait ends by itself.
+        const anyWant = SEATS.some((candidate) => votes[candidate]);
         return {
-          room: touched({ ...room, meta: { ...room.meta, rematch: votes } }),
+          room: touched({
+            ...room,
+            meta: {
+              ...room.meta,
+              rematch: votes,
+              rematchDeadline: anyWant ? now + REMATCH_TIMEOUT_MS : null,
+            },
+          }),
           effects: [{ to: 'all', msg: { t: 'rematch', votes } }],
         };
       }
 
       const cleared = touched({
         ...room,
-        meta: { ...room.meta, rematch: { p1: false, p2: false }, drawOfferedBy: null },
+        meta: {
+          ...room.meta,
+          rematch: { p1: false, p2: false },
+          rematchDeadline: null,
+          drawOfferedBy: null,
+        },
       });
       return advance(
         cleared,
@@ -578,7 +619,8 @@ function advance(
 
   const next: RoomState = {
     ...room,
-    meta: { ...room.meta, seq, drawOfferedBy: null, series },
+    // Any new state settles a pending offer: there is nothing left to answer.
+    meta: { ...room.meta, seq, drawOfferedBy: null, rematchDeadline: null, series },
     game,
   };
   return {
@@ -596,6 +638,8 @@ function advance(
  */
 export function nextAlarmAt(room: RoomState): number {
   const reapAt = room.meta.lastActivity + IDLE_REAP_MS;
+  // A pending rematch offer is the soonest thing the room owes anyone.
+  if (room.meta.rematchDeadline !== null) return Math.min(reapAt, room.meta.rematchDeadline);
   // A listed room wakes sooner, only to renew its listing. Still one alarm.
   if (listingOf(room)) return Math.min(reapAt, room.meta.lastActivity + RENEW_LISTING_MS);
   const game = room.game;

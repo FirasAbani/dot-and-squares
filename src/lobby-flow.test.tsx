@@ -310,6 +310,54 @@ describe('the public lobby, through the app', () => {
     expect(FakeWebSocket.last().url).toContain('grid=8');
   });
 
+  it('ends the match when a rematch offer is never answered', async () => {
+    render(<App />);
+    await nameYourself();
+    await userEvent.click(screen.getByRole('button', { name: 'Create Room' }));
+
+    const room = FakeWebSocket.last();
+    const finished = {
+      players: {
+        p1: { id: 'p1', username: 'Firas', initials: 'FA', squares: 9 },
+        p2: { id: 'p2', username: 'Grace', initials: 'GH', squares: 7 },
+      },
+      currentPlayer: 'p1',
+      edges: {},
+      squares: {},
+      status: 'finished',
+      winner: 'p1',
+      ending: 'resignation',
+      endedBy: 'p2',
+      lastClaimedSquares: [],
+      gridSize: 5,
+      clock: null,
+    };
+    act(() => {
+      room.accept();
+      room.emit({
+        t: 'welcome',
+        seat: 'p1',
+        code: 'ABC234',
+        seq: 1,
+        state: finished,
+        presence: { p1: 'connected', p2: 'disconnected' },
+        rematch: { p1: false, p2: false },
+        drawOfferedBy: null,
+        series: { p1: 1, p2: 0, draws: 0 },
+      });
+    });
+
+    // The opponent has quit. This player offers a rematch anyway, and the
+    // server gives up on it five seconds later.
+    act(() => room.emit({ t: 'rematch', votes: { p1: true, p2: false } }));
+    act(() => room.emit({ t: 'rematch-timeout' }));
+
+    // Back to the start, told why, rather than watching a screen that will
+    // never change.
+    expect(await screen.findByRole('button', { name: 'Create Room' })).toBeTruthy();
+    expect(screen.getByText(/did not answer — the match has ended/i)).toBeTruthy();
+  });
+
   it('comes back to the setup screen from the lobby', async () => {
     render(<App />);
     await nameYourself();
