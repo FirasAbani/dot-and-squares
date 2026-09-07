@@ -32,6 +32,23 @@ async function nameYourself() {
   await userEvent.type(initials, 'AL');
 }
 
+/** Name yourself, then open the lobby — the only door to an online game now. */
+async function enterLobby() {
+  await nameYourself();
+  await userEvent.click(screen.getByRole('button', { name: /Browse Open Games/ }));
+  act(() => {
+    FakeWebSocket.last().accept();
+    FakeWebSocket.last().emit({ t: 'lobby', games: [] });
+  });
+}
+
+/** Stage a game from the lobby and return the room socket that opened. */
+async function hostFromLobby(): Promise<FakeWebSocket> {
+  await userEvent.click(await screen.findByRole('button', { name: 'Start a Game' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Start Game' }));
+  return FakeWebSocket.last();
+}
+
 describe('the public lobby, through the app', () => {
   beforeEach(() => {
     FakeWebSocket.reset();
@@ -43,9 +60,10 @@ describe('the public lobby, through the app', () => {
     vi.unstubAllGlobals();
   });
 
-  it('offers Public and Private when staging an online game, public first', async () => {
+  it('offers Public and Private when staging a game, public first', async () => {
     render(<App />);
-    await userEvent.click(screen.getByRole('button', { name: 'Play Online' }));
+    await enterLobby();
+    await userEvent.click(screen.getByRole('button', { name: 'Start a Game' }));
 
     const publicButton = screen.getByRole('button', { name: /Public/ });
     const privateButton = screen.getByRole('button', { name: /Private/ });
@@ -58,27 +76,44 @@ describe('the public lobby, through the app', () => {
 
   it('tells the server a public room is public, and a private one is not', async () => {
     render(<App />);
-    await nameYourself();
-    await userEvent.click(screen.getByRole('button', { name: 'Create Room' }));
+    await enterLobby();
 
-    const url = FakeWebSocket.last().url;
+    const url = (await hostFromLobby()).url;
     expect(url).toContain('create=1');
     expect(url).toContain('pub=1');
   });
 
   it('omits pub=1 for a private room', async () => {
     render(<App />);
-    await nameYourself();
+    await enterLobby();
+    await userEvent.click(screen.getByRole('button', { name: 'Start a Game' }));
     await userEvent.click(screen.getByRole('button', { name: /Private/ }));
-    await userEvent.click(screen.getByRole('button', { name: 'Create Room' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Start Game' }));
 
     expect(FakeWebSocket.last().url).not.toContain('pub=1');
+  });
+
+  /**
+   * A private game is still hosted from the lobby, and still needs a code to
+   * send — losing that would lose the whole invite-a-friend path.
+   */
+  it('still hands a private host a code and a link to share', async () => {
+    render(<App />);
+    await enterLobby();
+    await userEvent.click(screen.getByRole('button', { name: 'Start a Game' }));
+    await userEvent.click(screen.getByRole('button', { name: /Private/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Start Game' }));
+
+    const room = FakeWebSocket.last();
+    act(() => room.accept());
+    expect(await screen.findByRole('heading', { name: /waiting/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /copy link/i })).toBeTruthy();
   });
 
   it('will not let a nameless player browse', async () => {
     render(<App />);
     await userEvent.click(screen.getByRole('button', { name: 'Play Online' }));
-    expect((screen.getByRole('button', { name: /Browse open games/ }) as HTMLButtonElement).disabled).toBe(
+    expect((screen.getByRole('button', { name: /Browse Open Games/ }) as HTMLButtonElement).disabled).toBe(
       true,
     );
   });
@@ -86,7 +121,7 @@ describe('the public lobby, through the app', () => {
   it('shows a game staged by someone else with no action from this player', async () => {
     render(<App />);
     await nameYourself();
-    await userEvent.click(screen.getByRole('button', { name: /Browse open games/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Browse Open Games/ }));
 
     expect(FakeWebSocket.last().url).toContain('/api/lobby');
     await screen.findByText(/loading open games/i);
@@ -104,7 +139,7 @@ describe('the public lobby, through the app', () => {
   it('takes a row away again when that game fills', async () => {
     render(<App />);
     await nameYourself();
-    await userEvent.click(screen.getByRole('button', { name: /Browse open games/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Browse Open Games/ }));
 
     act(() => {
       FakeWebSocket.last().accept();
@@ -120,7 +155,7 @@ describe('the public lobby, through the app', () => {
   it('opens the room socket when a game is chosen, and lets the lobby go', async () => {
     render(<App />);
     await nameYourself();
-    await userEvent.click(screen.getByRole('button', { name: /Browse open games/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Browse Open Games/ }));
 
     const lobbySocket = FakeWebSocket.last();
     act(() => {
@@ -184,7 +219,7 @@ describe('the public lobby, through the app', () => {
 
     render(<App />);
     await nameYourself();
-    await userEvent.click(screen.getByRole('button', { name: /Browse open games/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Browse Open Games/ }));
 
     act(() => {
       FakeWebSocket.last().accept();
@@ -205,7 +240,7 @@ describe('the public lobby, through the app', () => {
   it('leaves the lobby behind once a join lands', async () => {
     render(<App />);
     await nameYourself();
-    await userEvent.click(screen.getByRole('button', { name: /Browse open games/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Browse Open Games/ }));
     act(() => {
       FakeWebSocket.last().accept();
       FakeWebSocket.last().emit({ t: 'lobby', games: [listing('BBB222', 'Grace')] });
@@ -234,7 +269,7 @@ describe('the public lobby, through the app', () => {
     expect(screen.getByText(/taking a seat in grace's game/i)).toBeTruthy();
     expect(screen.queryByRole('button', { name: /copy link/i })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: /cancel|leave/i }));
-    expect(await screen.findByRole('button', { name: 'Create Room' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /Browse Open Games/ })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: /open games/i })).toBeNull();
   });
 
@@ -245,7 +280,7 @@ describe('the public lobby, through the app', () => {
     );
     render(<App />);
     await nameYourself();
-    await userEvent.click(screen.getByRole('button', { name: /Browse open games/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Browse Open Games/ }));
 
     const lobbySocket = FakeWebSocket.last();
     act(() => {
@@ -269,13 +304,13 @@ describe('the public lobby, through the app', () => {
     );
     // And the empty state offers a real next step rather than a dead end.
     expect(screen.getByText(/start one and you will be first in/i)).toBeTruthy();
-    expect(screen.getByRole('button', { name: /start a game and wait/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Start a Game' })).toBeTruthy();
   });
 
   it('lets the first player in stage a game and wait there', async () => {
     render(<App />);
     await nameYourself();
-    await userEvent.click(screen.getByRole('button', { name: /Browse open games/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Browse Open Games/ }));
 
     const lobbySocket = FakeWebSocket.last();
     act(() => {
@@ -284,7 +319,8 @@ describe('the public lobby, through the app', () => {
     });
     expect(await screen.findByText(/start one and you will be first in/i)).toBeTruthy();
 
-    await userEvent.click(screen.getByRole('button', { name: /start a game and wait/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Start a Game' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Start Game' }));
 
     // She becomes the host of a public room — and is told so as a host, with a
     // code to share, not as someone joining a stranger's game.
@@ -295,27 +331,38 @@ describe('the public lobby, through the app', () => {
     await waitFor(() => expect(lobbySocket.readyState).toBe(FakeWebSocket.CLOSED));
   });
 
-  it('stages with the board and clock the player chose, not a default', async () => {
+  it('stages with the board the player chose, not a default', async () => {
     render(<App />);
-    await nameYourself();
-    // Move the board off its default before browsing.
+    await enterLobby();
+    await userEvent.click(screen.getByRole('button', { name: 'Start a Game' }));
     fireEvent.change(screen.getByLabelText(/Board/), { target: { value: '8' } });
-    await userEvent.click(screen.getByRole('button', { name: /Browse open games/ }));
-    act(() => {
-      FakeWebSocket.last().accept();
-      FakeWebSocket.last().emit({ t: 'lobby', games: [] });
-    });
-    await userEvent.click(await screen.findByRole('button', { name: /start a game and wait/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Start Game' }));
 
     expect(FakeWebSocket.last().url).toContain('grid=8');
   });
 
-  it('ends the match when a rematch offer is never answered', async () => {
+  /**
+   * The setup screen no longer creates anything: an online game has exactly one
+   * origin, and it is the lobby. A second Create button here is what let the
+   * board be picked twice, in two places, and silently disagree.
+   */
+  it('offers no way to create a room from the setup screen', async () => {
     render(<App />);
     await nameYourself();
-    await userEvent.click(screen.getByRole('button', { name: 'Create Room' }));
 
-    const room = FakeWebSocket.last();
+    expect(screen.queryByRole('button', { name: 'Create Room' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Public/ })).toBeNull();
+    expect(screen.queryByLabelText(/Board/)).toBeNull();
+    expect(screen.getByRole('button', { name: /Browse Open Games/ })).toBeTruthy();
+    // The invite path stays: a code someone sent you still gets you in.
+    expect(screen.getByLabelText(/have a code/i)).toBeTruthy();
+  });
+
+  it('ends the match when a rematch offer is never answered', async () => {
+    render(<App />);
+    await enterLobby();
+
+    const room = await hostFromLobby();
     const finished = {
       players: {
         p1: { id: 'p1', username: 'Firas', initials: 'FA', squares: 9 },
@@ -354,17 +401,17 @@ describe('the public lobby, through the app', () => {
 
     // Back to the start, told why, rather than watching a screen that will
     // never change.
-    expect(await screen.findByRole('button', { name: 'Create Room' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /Browse Open Games/ })).toBeTruthy();
     expect(screen.getByText(/did not answer — the match has ended/i)).toBeTruthy();
   });
 
   it('comes back to the setup screen from the lobby', async () => {
     render(<App />);
     await nameYourself();
-    await userEvent.click(screen.getByRole('button', { name: /Browse open games/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Browse Open Games/ }));
     act(() => FakeWebSocket.last().accept());
 
     await userEvent.click(screen.getByRole('button', { name: 'Back' }));
-    expect(await screen.findByRole('button', { name: 'Create Room' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /Browse Open Games/ })).toBeTruthy();
   });
 });

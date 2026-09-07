@@ -21,7 +21,11 @@ async function seatedAt(seat: 'p1' | 'p2') {
   const ini = screen.getByLabelText(/initials/i) as HTMLInputElement;
   await userEvent.clear(ini);
   await userEvent.type(ini, seat === 'p1' ? 'AL' : 'BO');
-  await userEvent.click(screen.getByRole('button', { name: 'Create Room' }));
+  // Online games are staged from the lobby, so that is the way in.
+  await userEvent.click(screen.getByRole('button', { name: /Browse Open Games/ }));
+  act(() => FakeWebSocket.last().accept());
+  await userEvent.click(await screen.findByRole('button', { name: 'Start a Game' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Start Game' }));
 
   const socket = FakeWebSocket.last();
   act(() => {
@@ -58,7 +62,7 @@ describe('a rematch offer that expires', () => {
     act(() => socket.emit({ t: 'rematch-timeout' }));
 
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Create Room' })).toBeTruthy(),
+      expect(screen.getByRole('button', { name: /Browse Open Games/ })).toBeTruthy(),
     );
     expect(screen.getByText(/did not answer — the match has ended/i)).toBeTruthy();
   });
@@ -69,7 +73,7 @@ describe('a rematch offer that expires', () => {
     act(() => socket.emit({ t: 'rematch-timeout' }));
 
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Create Room' })).toBeTruthy(),
+      expect(screen.getByRole('button', { name: /Browse Open Games/ })).toBeTruthy(),
     );
   });
 });

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { LobbyListing } from '../shared/protocol';
@@ -107,21 +107,62 @@ describe('the public lobby', () => {
   it('lets the first player in start a game instead of dead-ending', async () => {
     const { onStage } = renderLobby();
     expect(screen.getByText(/start one and you will be first in/i)).toBeTruthy();
-    await userEvent.click(screen.getByRole('button', { name: /start a game and wait/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Start a Game' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Start Game' }));
     expect(onStage).toHaveBeenCalled();
   });
 
   it('still offers to start one when other games are already listed', async () => {
     const { onStage } = renderLobby({ games: [listing('AAA111', 'Ada')] });
-    await userEvent.click(screen.getByRole('button', { name: /start a game and wait/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Start a Game' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Start Game' }));
     expect(onStage).toHaveBeenCalled();
   });
 
   it('holds the start button while a join is in flight', () => {
     renderLobby({ games: [listing('AAA111', 'Ada')], busyCode: 'AAA111' });
     expect(
-      (screen.getByRole('button', { name: /start a game and wait/i }) as HTMLButtonElement).disabled,
+      (screen.getByRole('button', { name: 'Start a Game' }) as HTMLButtonElement).disabled,
     ).toBe(true);
+  });
+
+  /**
+   * The board, the clock and who can join were all asked on the setup screen
+   * before anyone had decided to host. They are asked here now, at the moment a
+   * game is actually staged — and the choice has to reach the caller.
+   */
+  it('asks for the board, the clock and who can join before staging', async () => {
+    const { onStage } = renderLobby();
+    await userEvent.click(screen.getByRole('button', { name: 'Start a Game' }));
+
+    expect(screen.getByRole('heading', { name: /start a game/i })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/Board/), { target: { value: '7' } });
+    await userEvent.click(screen.getByRole('button', { name: /Private/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Start Game' }));
+
+    expect(onStage).toHaveBeenCalledWith(
+      expect.objectContaining({ gridSize: 7, visibility: 'private' }),
+    );
+  });
+
+  it('defaults a staged game to public, so the lobby it was started from fills', async () => {
+    const { onStage } = renderLobby();
+    await userEvent.click(screen.getByRole('button', { name: 'Start a Game' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Start Game' }));
+
+    expect(onStage).toHaveBeenCalledWith(expect.objectContaining({ visibility: 'public' }));
+  });
+
+  it('lets the player back out of staging to the list', async () => {
+    const { onStage, onBack } = renderLobby({ games: [listing('AAA111', 'Ada')] });
+    await userEvent.click(screen.getByRole('button', { name: 'Start a Game' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    // Back to the list, not out of the lobby altogether.
+    expect(screen.getByRole('heading', { name: /open games/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: "Join Ada's game" })).toBeTruthy();
+    expect(onStage).not.toHaveBeenCalled();
+    expect(onBack).not.toHaveBeenCalled();
   });
 
   it('offers a way back', async () => {

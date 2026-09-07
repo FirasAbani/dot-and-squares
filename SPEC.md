@@ -392,14 +392,23 @@ softer alternatives because the board is the content and the chrome should not c
 ### 7.2 Screens
 
 1. **Setup** — mode (Pass & Play / Play Online / Play the Computer), player names and
-   initials, board size, speed, difficulty. Only the controls that do something are
-   rendered: a joiner inherits the host's board and clock, so those controls are hidden
-   rather than shown inert.
-   Staging an online game also chooses **Public** (listed in the lobby) or **Private**
-   (code only), defaulting to public — a lobby nobody stages into is an empty lobby.
-2. **Open games** — the live public lobby: one row per pending game with host, board and
-   clock, newest first, updating without any user action. An empty state that invites the
-   player to stage one. A refused join returns here with a plain explanation, never a
+   initials, and — for the two offline modes — board size, speed, difficulty. Only the
+   controls that do something are rendered: a joiner inherits the host's board and clock,
+   so those controls are hidden rather than shown inert.
+   The online tab carries exactly two things: **Browse Open Games**, the single way into
+   an online match, and a room-code field for someone who was sent an invite. It creates
+   nothing. Board, clock and visibility are asked in the lobby, at the moment a game is
+   actually staged — asking them here, before anyone has decided to host, is what let the
+   same settings be picked in two places and disagree.
+2. **Open games** — the live public lobby, and the one origin of an online game: one row
+   per pending game with host, board and clock, newest first, updating without any user
+   action. An empty state that invites the player to stage one. **Start a Game** opens a
+   staging panel in place of the list — board, speed, and **Public** (listed here) or
+   **Private** (link only), defaulting to public, since a lobby nobody stages into is an
+   empty lobby. Replacing the list rather than sitting under it keeps one primary action
+   per view and an obvious way back. A private game is still staged from here and still
+   gets a code and share link on the Waiting screen; visibility only decides whether the
+   row appears in this list. A refused join returns here with a plain explanation, never a
    dead end; every row is held while one join is in flight, so a double-tap cannot open
    two sockets. The app holds this screen until the room the joiner picked actually
    answers with a seat — routing away the instant the socket opens, rather than waiting
@@ -540,7 +549,7 @@ The suite that must exist and pass. Current totals: **260 unit tests** across el
 | Lobby logic (~29) | Listing and upserting by code, unlisting, a silent no-op for an unknown code, expiry hidden from `visibleGames` and swept by the alarm, partial sweeps keeping survivors, one alarm at the earliest expiry and none when empty, the full-lobby cap refusing newcomers while still letting an existing host renew, sender-only snapshots for connect and refresh, `bad-message` for anything else, and that no branch mutates its input |
 | Lobby feed (~11) | Connects at the right protocol version, fills from a snapshot, replaces the list wholesale rather than appending, survives an unreadable frame, retries after an unexpected close, stops retrying once closed deliberately, refreshes when the tab returns, closes on unmount, and stays idempotent across repeated `close()` calls (a caller closing from an effect on every render must not force a re-render loop) |
 | Public lobby UI (~9) | A row per game with host, board and clock; the empty state only once loaded, never while connecting; joining the row that was pressed; every row held during a join; the filled-game notice; the reconnecting state |
-| Lobby flow (~10) | Through the real App: the Public/Private toggle defaulting to public, `pub=1` sent only for a public room, browsing gated on a name, **a game appearing with no user action at all**, a row vanishing when it fills, the room socket opening while the lobby is held until a seat lands, a refused join (close **1006**) returning to the list without a retry storm, a joiner never being shown the host's code or Copy link, and Back keeping the player's name and mode |
+| Lobby flow (~16) | Through the real App: the Public/Private toggle in the lobby's staging panel defaulting to public, `pub=1` sent only for a public room, a private host still getting a code and Copy link, the setup screen offering no way to create a room at all, browsing gated on a name, **a game appearing with no user action at all**, a row vanishing when it fills, the room socket opening while the lobby is held until a seat lands, a refused join (close **1006**) returning to the list without a retry storm, a joiner never being shown the host's code or Copy link, and Back keeping the player's name and mode |
 | Five-player scenario (~9) | At the React/jsdom level, not mocked further than the socket: two players already in a game, two hosts each waiting on their own public game, a browser who sees exactly the two open games and picks one, and a sixth onlooker root proving the same push reaches a second browser live; a join failing mid-click closing 1006, the lobby socket dropping and recovering, an empty snapshot, and join-then-leave returning to a sane screen |
 | Room logic (~50) | Seating, create-vs-join, token reclaim, room-full and room-exists refusals, turn ownership, stale seq, resign / draw offer / decline / accept, rematch votes, series tally counted once at the transition, alarm flagging, idle reap, next-alarm calculation, listing a public room and never a private one, withdrawing it when the game starts / the host drops / the host leaves / the room is reaped, re-listing a returning host, and refusing a joiner against an empty room rather than making them its host |
 | App (~42) | Setup validation, playing a match, keyboard play, quitting (both dev and deployed), match options, losing on time, playing the computer, chain accumulation and reset, the end screen addressing the right player, returning to setup with names kept, no dead controls |

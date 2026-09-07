@@ -111,7 +111,6 @@ export default function App() {
   const lobby = useLobbyFeed();
   const [browsing, setBrowsing] = useState(false);
   const [browsePlayer, setBrowsePlayer] = useState<PlayerSetupValues | null>(null);
-  const [browseOptions, setBrowseOptions] = useState<MatchOptions | null>(null);
   const [busyCode, setBusyCode] = useState<string | null>(null);
   const [lobbyNotice, setLobbyNotice] = useState<string | null>(null);
   /**
@@ -498,9 +497,8 @@ export default function App() {
   }, [busyCode, remote, lobby]);
 
   const browseLobby = useCallback(
-    (player: PlayerSetupValues, options: MatchOptions) => {
+    (player: PlayerSetupValues) => {
       setBrowsePlayer(player);
-      setBrowseOptions(options);
       setSavedPlayers((current) => ({
         one: player,
         two: current?.two ?? { username: 'Player 2', initials: 'P2' },
@@ -606,12 +604,12 @@ export default function App() {
           busyCode={busyCode}
           notice={lobbyNotice}
           onJoin={(code, hostName) => browsePlayer && joinFromLobby(code, browsePlayer, hostName)}
-          onStage={() => {
+          onStage={(options) => {
             if (!browsePlayer) return;
             // Being first in is fine — stage the game and wait right here.
             setBrowsing(false);
             lobby.close();
-            createRoom(browsePlayer, browseOptions ?? { gridSize: 5, timeControlMs: null, incrementMs: 0, visibility: 'public' });
+            createRoom(browsePlayer, options);
           }}
           onBack={() => {
             setBrowsing(false);
@@ -643,7 +641,6 @@ export default function App() {
         <PlayerSetup
           initialPlayers={savedPlayers}
           onStart={startGame}
-          onCreateRoom={createRoom}
           onJoinRoom={joinRoom}
           onBrowseLobby={browseLobby}
           initialCode={linkedRoom}

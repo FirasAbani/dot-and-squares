@@ -100,11 +100,19 @@ function welcome(code: string, seat: 'p1' | 'p2', state: unknown) {
   };
 }
 
-/** Stage a public game and stop on the host's waiting screen. */
+/**
+ * Stage a public game and stop on the host's waiting screen.
+ *
+ * Hosting runs through the lobby now, so this walks the same two screens a
+ * player does: open the list, then start a game from it.
+ */
 async function hostPublicGame(name: string, initials: string) {
   const root = mount();
   await goOnline(root, name, initials);
-  await userEvent.click(within(root).getByRole('button', { name: 'Create Room' }));
+  await userEvent.click(within(root).getByRole('button', { name: /Browse Open Games/ }));
+  act(() => FakeWebSocket.last().accept());
+  await userEvent.click(await within(root).findByRole('button', { name: 'Start a Game' }));
+  await userEvent.click(within(root).getByRole('button', { name: 'Start Game' }));
   const socket = FakeWebSocket.last();
   const code = codeOf(socket);
   act(() => {
@@ -118,7 +126,7 @@ async function hostPublicGame(name: string, initials: string) {
 async function browse(name: string, initials: string) {
   const root = mount();
   await goOnline(root, name, initials);
-  await userEvent.click(within(root).getByRole('button', { name: /Browse open games/ }));
+  await userEvent.click(within(root).getByRole('button', { name: /Browse Open Games/ }));
   const socket = FakeWebSocket.last();
   act(() => socket.accept());
   return { root, socket };
@@ -333,7 +341,7 @@ describe('five players around one public lobby', () => {
   it('shows an empty lobby that is not mistakable for still loading', async () => {
     const root = mount();
     await goOnline(root, 'Eve', 'EV');
-    await userEvent.click(within(root).getByRole('button', { name: /Browse open games/ }));
+    await userEvent.click(within(root).getByRole('button', { name: /Browse Open Games/ }));
     const socket = FakeWebSocket.last();
 
     // Before the socket opens: loading, and no "no games" claim.
@@ -383,7 +391,9 @@ describe('five players around one public lobby', () => {
     await userEvent.click(leave);
 
     // Back on setup — not stranded on a lobby with nothing behind it.
-    expect(await within(eve.root).findByRole('button', { name: 'Create Room' })).toBeTruthy();
+    expect(
+      await within(eve.root).findByRole('button', { name: /Browse Open Games/ }),
+    ).toBeTruthy();
     expect(within(eve.root).queryByRole('heading', { name: /open games/i })).toBeNull();
   });
 });
@@ -467,10 +477,13 @@ describe('what Eve sees between clicking Join and the room answering', () => {
     const eve = await browse('Eve', 'EV');
     act(() => eve.socket.emit({ t: 'lobby', games: [listingFor(cara.code, 'Cara')] }));
     await userEvent.click(await within(eve.root).findByRole('button', { name: "Join Cara's game" }));
+    // Counted relative to what is already open — Cara reached her own game
+    // through the lobby too, so an absolute number would only measure that.
+    const feedsBefore = socketsFor('/api/lobby').length;
     act(() => socketFor(`/api/room/${cara.code}`).close(1006));
 
     await within(eve.root).findByRole('alert');
     await new Promise((r) => setTimeout(r, 60));
-    expect(socketsFor('/api/lobby')).toHaveLength(2);
+    expect(socketsFor('/api/lobby')).toHaveLength(feedsBefore + 1);
   });
 });

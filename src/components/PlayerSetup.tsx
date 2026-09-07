@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react';
 import {
-  MAX_GRID_SIZE,
-  MIN_GRID_SIZE,
   SPEEDS,
   describeTimeControl,
   timeControlFor,
@@ -10,6 +8,7 @@ import {
 import { fetchRoomInfo, isValidRoomCode, normaliseRoomCode } from '../net/roomCode';
 import type { RoomInfo, RoomVisibility } from '../shared/protocol';
 import { DIFFICULTIES, type Difficulty } from '../ai/bot';
+import { MatchOptionsFields } from './MatchOptionsFields';
 import { PLAYER_THEME } from './theme';
 
 export interface MatchOptions {
@@ -33,9 +32,9 @@ interface PlayerSetupProps {
     playerTwo: PlayerSetupValues,
     options: MatchOptions,
   ) => void;
-  onCreateRoom?: (player: PlayerSetupValues, options: MatchOptions) => void;
   onJoinRoom?: (code: string, player: PlayerSetupValues) => void;
-  onBrowseLobby?: (player: PlayerSetupValues, options: MatchOptions) => void;
+  /** Online games are all started from the lobby, so this only carries a name. */
+  onBrowseLobby?: (player: PlayerSetupValues) => void;
   /** Pre-filled from a ?room= link so a shared invite only asks for a name. */
   initialCode?: string;
   /** Where to land. Set when returning from the lobby, so Back does not
@@ -66,7 +65,6 @@ function validate(values: PlayerSetupValues): FieldErrors {
 
 export function PlayerSetup({
   onStart,
-  onCreateRoom,
   onJoinRoom,
   onBrowseLobby,
   initialCode,
@@ -89,13 +87,11 @@ export function PlayerSetup({
   const [gridSize, setGridSize] = useState(5);
   const [speed, setSpeed] = useState(SPEEDS[0]);
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
-  // Public by default: a lobby nobody stages games into is an empty lobby.
-  const [visibility, setVisibility] = useState<RoomVisibility>('public');
   const [invite, setInvite] = useState<RoomInfo | null>(null);
   const [checking, setChecking] = useState(false);
 
-  // The host picks the board and clock; a joiner inherits them, so those
-  // controls are hidden rather than shown doing nothing.
+  // A joiner inherits the host's board and clock, so those controls are hidden
+  // rather than shown doing nothing.
   const joining = mode === 'online' && isValidRoomCode(normaliseRoomCode(code));
 
   // Look the room up as soon as a full code is present, so the joiner sees the
@@ -144,6 +140,9 @@ export function PlayerSetup({
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
+    // Nothing here starts an online game any more — the lobby does. Enter in
+    // the room-code field must not fall through to a pass-and-play start.
+    if (mode === 'online') return;
     if (!isValid) {
       setShowErrors(true);
       return;
@@ -153,10 +152,6 @@ export function PlayerSetup({
       timeControlMs: timeControl.ms,
       incrementMs: timeControl.incrementMs,
     };
-    if (mode === 'online') {
-      onCreateRoom?.(one, { ...options, visibility });
-      return;
-    }
     if (mode === 'computer') {
       onStart(one, COMPUTER_PLAYER, { ...options, botDifficulty: difficulty });
       return;
@@ -248,63 +243,27 @@ export function PlayerSetup({
         {mode === 'local' && renderFields('Player 2', 'p2', two, setTwo, errorsTwo)}
       </div>
 
-      {mode === 'online' && !joining && (
-        <div className="field">
-          <span className="field__label" id="visibility-label">
-            Who can join
-          </span>
-          <div className="setup__choices" role="group" aria-labelledby="visibility-label">
-            <button
-              type="button"
-              className={
-                visibility === 'public'
-                  ? 'button button--ghost button--chosen time-control'
-                  : 'button button--ghost time-control'
-              }
-              aria-pressed={visibility === 'public'}
-              onClick={() => setVisibility('public')}
-            >
-              <span className="time-control__label">Public</span>
-              <span className="time-control__kind">Anyone browsing the lobby can join</span>
-            </button>
-            <button
-              type="button"
-              className={
-                visibility === 'private'
-                  ? 'button button--ghost button--chosen time-control'
-                  : 'button button--ghost time-control'
-              }
-              aria-pressed={visibility === 'private'}
-              onClick={() => setVisibility('private')}
-            >
-              <span className="time-control__label">Private</span>
-              <span className="time-control__kind">Only people with your code</span>
-            </button>
-          </div>
-        </div>
-      )}
-
+      {/* Online has one way in — the lobby — where the board, the clock and who
+          can join are all chosen at the moment a game is actually staged. This
+          screen only needs a name and, for an invited player, their code. */}
       {mode === 'online' && (
         <div className="field">
           {!joining && (
-            <button
-              type="button"
-              className="button setup__browse"
-              disabled={!onlineValid}
-              onClick={() =>
-                onBrowseLobby?.(one, {
-                  gridSize,
-                  timeControlMs: timeControl.ms,
-                  incrementMs: timeControl.incrementMs,
-                  visibility: 'public',
-                })
-              }
-            >
-              Browse open games
-            </button>
-          )}
-          {!joining && !onlineValid && (
-            <p className="board__hint">Enter your name above to browse.</p>
+            <>
+              <button
+                type="button"
+                className="button button--primary setup__browse"
+                disabled={!onlineValid}
+                onClick={() => onBrowseLobby?.(one)}
+              >
+                Browse Open Games
+              </button>
+              <p className="board__hint">
+                {onlineValid
+                  ? 'Join a game that is waiting, or start your own from there.'
+                  : 'Enter your name above to browse.'}
+              </p>
+            </>
           )}
           <label className="field__label" htmlFor="room-code">
             Have a code? Join their game
@@ -375,9 +334,7 @@ export function PlayerSetup({
                   Accept &amp; Play
                 </button>
               </div>
-              {!onlineValid && (
-                <p className="board__hint">Enter your name above to accept.</p>
-              )}
+              {!onlineValid && <p className="board__hint">Enter your name above to accept.</p>}
             </div>
           )}
 
@@ -415,57 +372,18 @@ export function PlayerSetup({
         </div>
       )}
 
-      {!joining && (
-      <div className="setup__options">
-        <div className="field">
-          <label className="field__label" htmlFor="grid-size">
-            Board — {gridSize} &times; {gridSize} dots, {(gridSize - 1) ** 2} squares
-          </label>
-          <input
-            id="grid-size"
-            type="range"
-            className="setup__range"
-            min={MIN_GRID_SIZE}
-            max={MAX_GRID_SIZE}
-            step={1}
-            value={gridSize}
-            onChange={(event) => setGridSize(Number(event.target.value))}
-          />
-        </div>
-
-        <div className="field">
-          <span className="field__label" id="time-control-label">
-            Speed — {describeTimeControl(timeControl)} on this board
-          </span>
-          <div className="setup__choices" role="group" aria-labelledby="time-control-label">
-            {SPEEDS.map((option) => {
-              const control = timeControlFor(gridSize, option);
-              return (
-                <button
-                  key={option.id}
-                  type="button"
-                  className={
-                    option.id === speed.id
-                      ? 'button button--ghost button--chosen time-control'
-                      : 'button button--ghost time-control'
-                  }
-                  aria-pressed={option.id === speed.id}
-                  onClick={() => setSpeed(option)}
-                >
-                  <span className="time-control__label">{option.label}</span>
-                  <span className="time-control__kind">{describeTimeControl(control)}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
+      {mode !== 'online' && (
+        <MatchOptionsFields
+          gridSize={gridSize}
+          onGridSize={setGridSize}
+          speed={speed}
+          onSpeed={setSpeed}
+        />
       )}
 
-      {!joining && (
+      {mode !== 'online' && (
         <button type="submit" className="button button--primary" disabled={!isValid}>
-          {mode === 'online' ? 'Create Room' : mode === 'computer' ? 'Play Computer' : 'Start Game'}
+          {mode === 'computer' ? 'Play Computer' : 'Start Game'}
         </button>
       )}
       {showErrors && !isValid && (
