@@ -358,6 +358,18 @@ no namespace and routing is not the only thing defending it.
 Without that rule a listing outliving its room would let any browser become the host of a
 room it never staged.
 
+**A game is dealt only when both players are actually connected — INVARIANT.** Seats are
+claimed, not released, so a room can hold a chair whose player has gone. Dealing on "both
+chairs claimed" hands the first turn to someone who is not coming back, and the other player
+is left on a board they can never move on — which is what a stale lobby row produced in
+production.
+
+**An abandoned room is taken over, not refused.** Deregistration needs the host's disconnect
+to be *observed*, and a browser that dies without a close frame never is, so a row can
+outlive its host until the listing expires. A player who clicks one becomes its host and
+waits, and it is re-listed under their name with the board and clock it was staged with.
+Being first into a game is a normal thing to be, so this is a better answer than an error.
+
 ---
 
 ## 7. Interface
@@ -636,3 +648,4 @@ rules to be rewritten when the server needs them.
 17. An alarm that renews state must move its own next deadline forward, or it is a timer.
 18. The server validates room codes against the real alphabet, so a confusable code cannot
     open a different room.
+19. A game is dealt only when both players are connected, never merely both seats claimed.

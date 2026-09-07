@@ -70,6 +70,9 @@ Two invariants that keep it free and correct:
 
 Three more for the public lobby:
 
+- **Deal only when both players are connected.** A seat is claimed, not released, so "both
+  chairs taken" is not "both players here". Dealing on the weaker test gives the first turn
+  to someone who has gone, and the other player gets a board they can never move on.
 - **The lobby is a cache; the room is the authority.** A listing never grants a seat — a
   stale row is refused by the room itself. That is what lets announcements be advisory.
 - **The room registers itself**, through a `{ lobby: … }` effect returned by `reduceRoom`.

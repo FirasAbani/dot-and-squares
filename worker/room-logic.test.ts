@@ -624,3 +624,89 @@ describe('renewing a listing without spinning', () => {
     expect(reaped.effects.some((effect) => 'closeRoom' in effect)).toBe(true);
   });
 });
+
+describe('a room whose host has vanished', () => {
+  const lobbyNotes = (effects: { lobby?: unknown }[]) =>
+    effects.flatMap((effect) => (effect.lobby ? [effect.lobby] : []));
+
+  /** Public, staged, then the host's browser died without a close frame. */
+  function abandoned() {
+    const created = joinRoom(emptyRoom('ABC234', 1000), {
+      ...ada,
+      wantsCreate: true,
+      now: 1000,
+      visibility: 'public',
+    });
+    if (!created.ok) throw new Error(created.failure);
+    // Nobody is connected any more; the seat record survives in storage.
+    return { ...created.room, connected: { p1: false, p2: false } };
+  }
+
+  it('never deals a game whose first turn belongs to someone who is gone', () => {
+    const joined = joinRoom(abandoned(), { ...grace, wantsCreate: false, now: 2000 });
+    if (!joined.ok) throw new Error(joined.failure);
+    expect(joined.room.game).toBeNull();
+  });
+
+  it('makes the arriving player the host, waiting for someone else', () => {
+    const joined = joinRoom(abandoned(), { ...grace, wantsCreate: false, now: 2000 });
+    if (!joined.ok) throw new Error(joined.failure);
+    expect(joined.seat).toBe('p1');
+    expect(joined.room.meta.seats.p1?.username).toBe('Grace');
+    expect(joined.room.meta.seats.p2).toBeNull();
+  });
+
+  it('re-lists it so the next player can find them', () => {
+    const joined = joinRoom(abandoned(), { ...grace, wantsCreate: false, now: 2000 });
+    if (!joined.ok) throw new Error(joined.failure);
+    expect(lobbyNotes(joined.effects)).toEqual([
+      expect.objectContaining({ k: 'list' }),
+    ]);
+    expect(listingOf(joined.room)?.hostName).toBe('Grace');
+  });
+
+  it('then plays normally when someone joins them', () => {
+    const taken = joinRoom(abandoned(), { ...grace, wantsCreate: false, now: 2000 });
+    if (!taken.ok) throw new Error(taken.failure);
+    const third = joinRoom(taken.room, {
+      token: 'tok-third',
+      username: 'Zoe',
+      initials: 'ZO',
+      wantsCreate: false,
+      now: 3000,
+    });
+    if (!third.ok) throw new Error(third.failure);
+    expect(third.seat).toBe('p2');
+    expect(third.room.game?.status).toBe('playing');
+    expect(third.room.game?.players.p1.username).toBe('Grace');
+  });
+
+  it('waits rather than dealing when the other player is claimed but away', () => {
+    // Host staged, then dropped, while a guest is sitting in the room.
+    const created = seat(emptyRoom('ABC234', 0), ada, true);
+    const guest = seat(created.room, grace);
+    const hostGone = reduceRoom(guest.room, { k: 'disconnect', seat: 'p1', now: 2000 });
+    // A fresh game in that room must not be dealt to an absent chair.
+    const restarted = { ...hostGone.room, game: null };
+    const backAgain = joinRoom(restarted, { ...grace, wantsCreate: false, now: 3000 });
+    if (!backAgain.ok) throw new Error(backAgain.failure);
+    expect(backAgain.room.game).toBeNull();
+  });
+
+  it('deals the moment the missing player comes back', () => {
+    const created = seat(emptyRoom('ABC234', 0), ada, true);
+    const guest = seat(created.room, grace);
+    const hostGone = reduceRoom(guest.room, { k: 'disconnect', seat: 'p1', now: 2000 });
+    const restarted = { ...hostGone.room, game: null };
+    const hostBack = joinRoom(restarted, { ...ada, wantsCreate: false, now: 4000 });
+    if (!hostBack.ok) throw new Error(hostBack.failure);
+    expect(hostBack.seat).toBe('p1');
+    expect(hostBack.room.game?.status).toBe('playing');
+  });
+
+  it('still deals normally when both players are present', () => {
+    const created = seat(emptyRoom('ABC234', 0), ada, true);
+    const joined = seat(created.room, grace);
+    expect(joined.room.game?.status).toBe('playing');
+  });
+});

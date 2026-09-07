@@ -225,6 +225,38 @@ export function joinRoom(room: RoomState, req: JoinRequest): JoinResult {
   // mid-game rejoin the same match rather than taking the other chair.
   let seat = SEATS.find((candidate) => room.meta.seats[candidate]?.token === req.token);
 
+  /*
+   * An abandoned room: seats claimed, no game, and nobody actually here.
+   *
+   * This is what a stale lobby row leads to. Deregistration needs the host's
+   * disconnect to be *observed*, and a browser that dies without a close frame
+   * is never observed, so the row outlives its host until the listing expires.
+   * A player who clicks it used to be seated opposite the ghost, which filled
+   * the room and dealt a game whose first turn belonged to someone who was
+   * never coming back — a board you cannot move on, for ever.
+   *
+   * Taking the room over is better than refusing it: the player wanted a game,
+   * and being first into one is a normal thing to be. They become the host and
+   * wait, and the room is re-listed for whoever comes next.
+   */
+  if (!seat && !room.game && SEATS.some((s) => room.meta.seats[s]) && SEATS.every((s) => !room.connected[s])) {
+    const takenOver: RoomState = {
+      ...room,
+      meta: { ...room.meta, seats: { p1: null, p2: null } },
+    };
+    // Re-enter as the creator of the now-empty room, keeping the board, clock
+    // and visibility it was staged with — the newcomer chose none of those, and
+    // a joiner's request carries no settings to honour.
+    return joinRoom(takenOver, {
+      ...req,
+      wantsCreate: true,
+      gridSize: undefined,
+      timeControlMs: undefined,
+      incrementMs: undefined,
+      visibility: visibilityOf(room),
+    });
+  }
+
   if (!seat) {
     seat = SEATS.find((candidate) => room.meta.seats[candidate] === null);
     if (!seat) return { ok: false, failure: 'room-full' };
@@ -259,10 +291,13 @@ export function joinRoom(room: RoomState, req: JoinRequest): JoinResult {
 
   const effects: Effect[] = [];
 
-  // Both chairs filled and nothing under way: deal a new game.
+  // Both chairs filled, both players actually present, and nothing under way:
+  // deal a new game. Presence matters — dealing to a claimed-but-absent chair
+  // hands the first turn to someone who is not there.
   const p1 = next.meta.seats.p1;
   const p2 = next.meta.seats.p2;
-  if (!next.game && p1 && p2) {
+  const bothHere = SEATS.every((s) => next.connected[s]);
+  if (!next.game && p1 && p2 && bothHere) {
     next = {
       ...next,
       meta: { ...next.meta, seq: next.meta.seq + 1 },
