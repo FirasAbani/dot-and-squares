@@ -23,17 +23,23 @@ async function main() {
     process.exit(2);
   }
 
+  // A deploy takes a few seconds to reach the edge, so a check run straight
+  // after one reports the previous build. Retry briefly before believing it.
   let live;
-  try {
-    const response = await fetch(LIVE, { headers: { 'cache-control': 'no-cache' } });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    live = assetsOf(await response.text());
-  } catch (error) {
-    console.error(`Could not reach ${LIVE}: ${error.message}`);
-    process.exit(2);
+  let same = false;
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    try {
+      const response = await fetch(LIVE, { headers: { 'cache-control': 'no-cache' } });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      live = assetsOf(await response.text());
+    } catch (error) {
+      console.error(`Could not reach ${LIVE}: ${error.message}`);
+      process.exit(2);
+    }
+    same = JSON.stringify(local) === JSON.stringify(live);
+    if (same) break;
+    if (attempt < 5) await new Promise((resolve) => setTimeout(resolve, 3000));
   }
-
-  const same = JSON.stringify(local) === JSON.stringify(live);
 
   // A capability probe as well as a hash match: it names *what* is missing,
   // which a pair of opaque hashes never can.
