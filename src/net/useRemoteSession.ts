@@ -50,6 +50,14 @@ export interface ConnectOptions {
 
 const BACKOFF_MS = [1000, 2000, 4000, 8000, 15000];
 
+/**
+ * A connect that yields neither an open nor a close is hanging. Generous, so a
+ * cold Durable Object is never mistaken for a failure — the happy path measures
+ * well under two seconds — but bounded, because an unbounded wait renders as an
+ * eternal spinner the player cannot tell from a crash.
+ */
+const CONNECT_TIMEOUT_MS = 15000;
+
 export function useRemoteSession(): RemoteSession {
   const [status, setStatus] = useState<ConnectionStatus>('idle');
   const [code, setCode] = useState<string | null>(null);
@@ -77,6 +85,7 @@ export function useRemoteSession(): RemoteSession {
    * two apart: never opened means the server said no, and retrying is pointless.
    */
   const everOpenedRef = useRef(false);
+  const connectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const send = useCallback((msg: ClientMessage) => {
     const socket = socketRef.current;
@@ -158,9 +167,28 @@ export function useRemoteSession(): RemoteSession {
       );
       socketRef.current = socket;
 
+      if (connectTimerRef.current) clearTimeout(connectTimerRef.current);
+      connectTimerRef.current = setTimeout(() => {
+        connectTimerRef.current = null;
+        if (socketRef.current !== socket || socket.readyState === WebSocket.OPEN) return;
+        // Closing by hand turns a silent stall into the onclose we already know
+        // how to explain. A socket closed while still CONNECTING does not
+        // reliably deliver onclose, so a first attempt says so itself.
+        socket.close();
+        if (socketRef.current === socket && !everOpenedRef.current) {
+          socketRef.current = null;
+          setStatus('closed');
+          setFailure('room-closed');
+        }
+      }, CONNECT_TIMEOUT_MS);
+
       socket.onopen = () => {
         attemptRef.current = 0;
         everOpenedRef.current = true;
+        if (connectTimerRef.current) {
+          clearTimeout(connectTimerRef.current);
+          connectTimerRef.current = null;
+        }
         setStatus('open');
       };
 
@@ -173,6 +201,10 @@ export function useRemoteSession(): RemoteSession {
       };
 
       socket.onclose = (event) => {
+        if (connectTimerRef.current) {
+          clearTimeout(connectTimerRef.current);
+          connectTimerRef.current = null;
+        }
         socketRef.current = null;
         if (closedByUsRef.current) {
           setStatus('closed');
@@ -223,6 +255,10 @@ export function useRemoteSession(): RemoteSession {
   const disconnect = useCallback(() => {
     closedByUsRef.current = true;
     if (retryRef.current) clearTimeout(retryRef.current);
+    if (connectTimerRef.current) {
+      clearTimeout(connectTimerRef.current);
+      connectTimerRef.current = null;
+    }
     send({ t: 'leave' });
     socketRef.current?.close();
     socketRef.current = null;
@@ -240,6 +276,7 @@ export function useRemoteSession(): RemoteSession {
     () => () => {
       closedByUsRef.current = true;
       if (retryRef.current) clearTimeout(retryRef.current);
+      if (connectTimerRef.current) clearTimeout(connectTimerRef.current);
       socketRef.current?.close();
     },
     [],

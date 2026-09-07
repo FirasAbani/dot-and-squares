@@ -238,6 +238,40 @@ describe('the public lobby, through the app', () => {
     expect(screen.queryByRole('heading', { name: /open games/i })).toBeNull();
   });
 
+  it('never re-offers a game that refused the join, even while the lobby still lists it', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: false, json: async () => ({}) })),
+    );
+    render(<App />);
+    await nameYourself();
+    await userEvent.click(screen.getByRole('button', { name: /Browse open games/ }));
+
+    const lobbySocket = FakeWebSocket.last();
+    act(() => {
+      lobbySocket.accept();
+      lobbySocket.emit({ t: 'lobby', games: [listing('BBB222', 'Grace')] });
+    });
+    await userEvent.click(await screen.findByRole('button', { name: "Join Grace's game" }));
+    act(() => FakeWebSocket.last().close(1006));
+
+    // The server has no idea the host is gone, so it keeps advertising the row.
+    // We do know: we were just refused by it.
+    await screen.findByRole('alert');
+    act(() => {
+      const feed = FakeWebSocket.instances.filter((s) => s.url.includes('/api/lobby')).pop()!;
+      feed.accept();
+      feed.emit({ t: 'lobby', games: [listing('BBB222', 'Grace')] });
+    });
+
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: "Join Grace's game" })).toBeNull(),
+    );
+    // And the empty state offers a real next step rather than a dead end.
+    expect(screen.getByText(/start one and you will be first in/i)).toBeTruthy();
+    expect(screen.getByRole('button', { name: /start a game and wait/i })).toBeTruthy();
+  });
+
   it('lets the first player in stage a game and wait there', async () => {
     render(<App />);
     await nameYourself();

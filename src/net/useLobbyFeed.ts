@@ -33,6 +33,16 @@ export function useLobbyFeed(): LobbyFeed {
 
   const connect = useCallback(() => {
     if (retryRef.current) clearTimeout(retryRef.current);
+    retryRef.current = null;
+    // Opening twice — browse, refused join, back to the list — used to leave
+    // the first socket live and unowned, with its onclose still armed to
+    // reconnect. Two feeds then raced, and the orphan was invisible.
+    const previous = socketRef.current;
+    if (previous) {
+      socketRef.current = null;
+      previous.onclose = null;
+      previous.close();
+    }
     closedByUsRef.current = false;
     setStatus((current) => (current === 'reconnecting' ? current : 'connecting'));
 

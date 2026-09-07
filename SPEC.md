@@ -531,7 +531,7 @@ with pre-change code — so the symptom looks like edits not taking effect, not 
 
 ## 9. Verification
 
-The suite that must exist and pass. Current totals: **221 unit tests** across nine files.
+The suite that must exist and pass. Current totals: **252 unit tests** across eleven files.
 
 | Layer | Coverage required |
 | --- | --- |
@@ -649,3 +649,6 @@ rules to be rewritten when the server needs them.
 18. The server validates room codes against the real alphabet, so a confusable code cannot
     open a different room.
 19. A game is dealt only when both players are connected, never merely both seats claimed.
+20. Every terminal connection state must be nameable on screen. A failed connect that renders
+    the same spinner as a slow one is a hang as far as the player is concerned, and a connect
+    with no timeout can spin for ever on nothing.

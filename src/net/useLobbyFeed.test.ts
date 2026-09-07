@@ -143,6 +143,24 @@ describe('useLobbyFeed', () => {
     expect(result.current.status).toBe('idle');
   });
 
+  it('replaces a live feed rather than running two', () => {
+    // Browse, get refused on a join, come back to the list: open() runs again
+    // while a socket is already live. The orphan kept its onclose armed and
+    // would quietly start a second, competing feed.
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useLobbyFeed());
+    act(() => result.current.open());
+    act(() => FakeWebSocket.last().accept());
+    const first = FakeWebSocket.last();
+
+    act(() => result.current.open());
+    expect(FakeWebSocket.instances).toHaveLength(2);
+    expect(first.readyState).toBe(FakeWebSocket.CLOSED);
+
+    act(() => void vi.advanceTimersByTime(20000));
+    expect(FakeWebSocket.instances).toHaveLength(2);
+  });
+
   it('closes the socket when the screen goes away', () => {
     const { result, unmount } = renderHook(() => useLobbyFeed());
     act(() => result.current.open());

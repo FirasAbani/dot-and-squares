@@ -114,6 +114,13 @@ export default function App() {
   const [browseOptions, setBrowseOptions] = useState<MatchOptions | null>(null);
   const [busyCode, setBusyCode] = useState<string | null>(null);
   const [lobbyNotice, setLobbyNotice] = useState<string | null>(null);
+  /**
+   * Rows the lobby is still advertising but that refused us on the way in. The
+   * feed is the server's view; this is what we have actually proven. Without it
+   * a dead row stays on screen and the second click looks exactly like the
+   * first — which is what "nothing happened" felt like.
+   */
+  const [deadCodes, setDeadCodes] = useState<string[]>([]);
   const [hosting, setHosting] = useState(true);
   const [joiningHost, setJoiningHost] = useState<string | null>(null);
   const [quitPhase, setQuitPhase] = useState<QuitPhase>('idle');
@@ -464,6 +471,7 @@ export default function App() {
         ? 'That game just filled — pick another.'
         : 'That game is no longer open — pick another.',
     );
+    setDeadCodes((current) => (current.includes(busyCode) ? current : [...current, busyCode]));
     setBusyCode(null);
     remote.disconnect();
     setOnline(false);
@@ -575,7 +583,7 @@ export default function App() {
     return (
       <main className="app">
         <PublicLobby
-          games={lobby.games}
+          games={lobby.games.filter((game) => !deadCodes.includes(game.code))}
           status={lobby.status}
           busyCode={busyCode}
           notice={lobbyNotice}
@@ -605,6 +613,7 @@ export default function App() {
           onCancel={leaveOnline}
           isHost={hosting}
           hostName={joiningHost}
+          failure={remote.failure}
         />
       </main>
     );
@@ -795,6 +804,12 @@ export default function App() {
           {remote.presence?.[mySeat === 'p1' ? 'p2' : 'p1'] === 'empty'
             ? 'Waiting for the other player to join…'
             : 'The other player disconnected — waiting for them to come back.'}
+          {/* On an untimed board their flag never falls, so without this the
+              only way out of a game nobody is playing was to forfeit and take
+              a recorded loss. Leaving is not the same thing as losing. */}
+          <button type="button" className="button button--ghost" onClick={leaveOnline}>
+            Leave game
+          </button>
         </p>
       )}
 
