@@ -1,0 +1,1077 @@
+/* Bold Utility — flat, high-contrast, square-cornered, heavy type.
+   Every colour pair here is measured; see the contrast table in README. */
+
+:root {
+  --bg: #0b0b0c;
+  --surface: #16171a;
+  --surface-2: #1e1f23;
+  --line: #34363c;
+  --ink: #ffffff;
+  /* 7.4:1 on --bg, 5.9:1 on --surface. Do not lighten the surfaces under it. */
+  --ink-muted: #9a9da3;
+  --ink-faint: #7f838a;
+  --danger: #ff6b6b;
+  /* White, because a dark ring is invisible on this background. */
+  --focus-ring: #ffffff;
+
+  /* 4/8px spacing scale — every gap, pad and margin comes from here. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* One knob for all UI motion, so reduced-motion can flatten it in one place. */
+  --motion-fast: 90ms;
+  --motion: 160ms;
+  --motion-slow: 220ms;
+
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 1ms;
+    --motion: 1ms;
+    --motion-slow: 1ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: Archivo, 'Helvetica Neue', Helvetica, system-ui, sans-serif;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Flat surfaces, square corners — the bevel is gone on purpose. */
+.panel,
+.board {
+  background: var(--surface);
+}
+
+/* Header ----------------------------------------------------------------- */
+
+.app__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.app__title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.app__header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.app__footer {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-1);
+}
+
+/* Setup screen ----------------------------------------------------------- */
+
+.setup {
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  margin-top: var(--space-6);
+}
+
+.setup__header h1 {
+  margin: 0 0 var(--space-2);
+  font-size: clamp(1.9rem, 8vw, 2.6rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.setup__header p {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.setup__players {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+
+.setup__player {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--player-color);
+  background: var(--surface-2);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.setup__player legend {
+  font-weight: 700;
+  color: var(--player-color);
+  padding: 0 var(--space-2);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.setup__hint {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.field__label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-muted);
+}
+
+.field input {
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 48px;
+}
+
+.field input::placeholder {
+  color: var(--ink-faint);
+}
+
+.field input:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-color: var(--focus-ring);
+}
+
+.field__initials {
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-weight: 800;
+  max-width: 8rem;
+}
+
+.field__error {
+  font-size: 0.74rem;
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* Buttons ---------------------------------------------------------------- */
+
+.button {
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  min-height: 52px;
+  padding: var(--space-3) var(--space-5);
+  cursor: pointer;
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  transition: background var(--motion-fast) ease, color var(--motion-fast) ease;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Every control needs a focus ring you can actually see. */
+.button:focus-visible,
+.board__svg:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* The one filled button on any screen — inverted, so it reads as the action. */
+.button--primary {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+
+.button--primary:hover:not(:disabled) {
+  background: #d7d9dd;
+  color: var(--bg);
+}
+
+.button--ghost {
+  min-height: 34px;
+  padding: 0 var(--space-3);
+  font-size: 0.68rem;
+}
+
+.button--danger {
+  color: var(--danger);
+  border-color: #4a2020;
+}
+
+.button--danger:not(.button--ghost) {
+  background: var(--danger);
+  color: #240808;
+  border-color: var(--danger);
+}
+
+.button--danger:not(.button--ghost):hover:not(:disabled) {
+  background: #ff8a8a;
+  color: #240808;
+}
+
+/* Scoreboard ------------------------------------------------------------- */
+
+.scoreboard {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2px;
+}
+
+.player-card {
+  padding: var(--space-3) var(--space-4);
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  grid-template-areas:
+    'initials name score clock'
+    'initials status score clock';
+  align-items: center;
+  column-gap: var(--space-4);
+  background: var(--surface);
+  border-left: 4px solid var(--player-color);
+  transition: background var(--motion) ease, color var(--motion) ease;
+}
+
+/* The active player inverts. Colour is not doing the work here — the initials
+   and the "your turn" label are. */
+.player-card--active {
+  background: var(--ink);
+  color: var(--bg);
+  border-left-color: var(--player-strong);
+}
+
+.player-card__identity {
+  display: contents;
+}
+
+.player-card__initials {
+  grid-area: initials;
+  font-weight: 800;
+  font-size: 1rem;
+  letter-spacing: 0.12em;
+  color: var(--ink);
+}
+
+.player-card__name {
+  grid-area: name;
+  font-size: 0.95rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player-card__score {
+  grid-area: score;
+  justify-self: end;
+  font-size: 2.5rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.player-card__status {
+  grid-area: status;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-muted);
+}
+
+/* Inactive cards mute their own text; the active card inherits the inverted
+   colour instead, so nothing drops below 4.5:1 in either state. */
+.player-card:not(.player-card--active) .player-card__name,
+.player-card:not(.player-card--active) .player-card__score {
+  color: var(--ink-muted);
+}
+
+.player-card:not(.player-card--active) .player-card__initials {
+  color: var(--ink-muted);
+}
+
+.player-card--active .player-card__initials,
+.player-card--active .player-card__name,
+.player-card--active .player-card__score,
+.player-card--active .player-card__status {
+  color: var(--bg);
+}
+
+/* Match options (board size, time control) ------------------------------- */
+
+.setup__options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.setup__choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.setup__choices .button {
+  flex: 1 1 auto;
+}
+
+/* The chosen option inverts, matching the active player card. */
+.button--chosen {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+
+/* Needed because `.button:hover:not(:disabled)` scores higher than a single
+   class, so without this the selected option loses its highlight the moment
+   the pointer lands on it — it reads as deselected. */
+.button--chosen:hover:not(:disabled) {
+  background: #d7d9dd;
+  color: var(--bg);
+}
+
+.setup__range {
+  width: 100%;
+  min-height: 44px;
+  accent-color: var(--ink);
+}
+
+.setup__range:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Clock ------------------------------------------------------------------ */
+
+.player-card__clock {
+  grid-area: clock;
+  justify-self: end;
+  align-self: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  padding-left: var(--space-3);
+}
+
+/* Under ten seconds. Colour is not the only cue — the format changes to
+   tenths at the same moment. */
+.player-card__clock--low {
+  color: var(--danger);
+}
+
+.player-card--active .player-card__clock--low {
+  color: #8c1111;
+}
+
+.overlay__title--loser {
+  color: var(--danger);
+  font-size: clamp(2.2rem, 12vw, 3.6rem);
+  letter-spacing: -0.04em;
+}
+
+/* Turn banner ------------------------------------------------------------ */
+
+.turn-banner {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) 2px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.turn-banner strong {
+  font-weight: 800;
+  color: var(--player-color);
+}
+
+/* Board ------------------------------------------------------------------ */
+
+.board {
+  padding: var(--space-3);
+  touch-action: manipulation;
+}
+
+.board__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.board__background {
+  fill: #16171a;
+}
+
+.board__hint {
+  margin: 0;
+  text-align: center;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.edge {
+  transition: stroke var(--motion-fast) ease, stroke-width var(--motion-fast) ease;
+}
+
+.edge__hit {
+  cursor: pointer;
+}
+
+/* The keyboard cursor. A slim dashed trace along the edge — the old fat 14px
+   version with a 2/6 dash rendered as a row of white blobs that looked like a
+   rendering fault. */
+.edge__cursor {
+  fill: none;
+  stroke-dasharray: 7 5;
+  stroke-opacity: 0.95;
+  pointer-events: none;
+}
+
+.square--new rect {
+  animation: pop var(--motion-slow) ease-out;
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Overlays --------------------------------------------------------------- */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+  background: rgba(11, 11, 12, 0.82);
+  animation: fade var(--motion) ease-out;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.overlay__panel {
+  width: min(420px, 100%);
+  padding: var(--space-6);
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.overlay__eyebrow {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.overlay__title {
+  margin: 0;
+  font-size: clamp(1.6rem, 7vw, 2.2rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.overlay__scores {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+}
+
+.overlay__score {
+  background: var(--surface-2);
+  border-left: 4px solid var(--player-color);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.overlay__score-initials {
+  font-weight: 800;
+  font-size: 0.8rem;
+  letter-spacing: 0.14em;
+  color: var(--player-color);
+}
+
+.overlay__score-value {
+  font-size: 2.2rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.overlay__score-name {
+  font-size: 0.74rem;
+  color: var(--ink-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.overlay__actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.overlay__actions .button {
+  flex: 1;
+}
+
+@media (max-width: 380px) {
+  .overlay__actions {
+    flex-direction: column;
+  }
+}
+
+/* Quit ------------------------------------------------------------------- */
+
+.quit-confirm__body {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+
+.quit-confirm__body code,
+.quit-screen__hint code {
+  font-family: 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.85em;
+  background: var(--surface-2);
+  color: var(--ink);
+  padding: 1px 5px;
+}
+
+.quit-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+}
+
+.quit-screen__panel {
+  width: min(420px, 100%);
+  padding: var(--space-6);
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.quit-screen__body {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+
+.quit-screen__label {
+  margin: var(--space-2) 0 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.quit-screen__command {
+  font-family: 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
+  font-size: 1rem;
+  font-weight: 700;
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  user-select: all;
+}
+
+.quit-screen__hint {
+  margin: 0;
+  font-size: 0.74rem;
+  color: var(--ink-muted);
+}
+
+/* Online play ------------------------------------------------------------ */
+
+.board__notice {
+  margin: 0;
+  padding: var(--space-3);
+  background: var(--surface-2);
+  border-left: 4px solid var(--danger);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.board__notice--offer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  border-left-color: var(--ink);
+}
+
+.setup__join {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.setup__code {
+  flex: 1 1 auto;
+  max-width: none;
+  text-align: center;
+}
+
+.lobby__code {
+  text-align: center;
+  font-size: 2rem;
+  letter-spacing: 0.3em;
+}
+
+/* Blitz time controls ---------------------------------------------------- */
+
+.time-control {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 46px;
+  padding: var(--space-2) var(--space-3);
+  line-height: 1.1;
+}
+
+.time-control__label {
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-control__kind {
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--ink-muted);
+}
+
+.button--chosen .time-control__kind {
+  color: var(--bg);
+}
+
+/* Invitation and waiting states ------------------------------------------ */
+
+.invite {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--ink);
+  background: var(--surface-2);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.invite__eyebrow {
+  margin: 0;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.invite__host {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.invite__facts {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.invite__facts dt {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.invite__facts dd {
+  margin: 2px 0 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.board__waiting {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--surface-2);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.board__waiting-dots {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.board__waiting-dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--ink-muted);
+  animation: waiting-pulse 1.2s ease-in-out infinite;
+}
+
+.board__waiting-dots i:nth-child(2) { animation-delay: 0.15s; }
+.board__waiting-dots i:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes waiting-pulse {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+
+/* Reduced motion already flattens durations globally; make the dots static
+   rather than blinking imperceptibly fast. */
+@media (prefers-reduced-motion: reduce) {
+  .board__waiting-dots i { animation: none; opacity: 0.6; }
+}
+
+/* Chains ----------------------------------------------------------------- */
+
+/* A real scale-in, staggered by position in the run, so a double claim reads
+   as two beats rather than one flash. The old `pop` was a plain fade. */
+.square--new rect {
+  animation: claim var(--motion-slow) ease-out backwards;
+  animation-delay: calc(var(--claim-index, 0) * 90ms);
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+.square--new text {
+  animation: claim var(--motion-slow) ease-out backwards;
+  animation-delay: calc(var(--claim-index, 0) * 90ms + 40ms);
+}
+
+@keyframes claim {
+  from {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.chain {
+  align-self: center;
+  padding: var(--space-2) var(--space-4);
+  background: var(--player-color);
+  color: var(--bg);
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  animation: chain-in var(--motion) ease-out;
+}
+
+@keyframes chain-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Celebration, chain tiers, chain vision -------------------------------- */
+
+/* The winner's board is replayed before the result panel arrives. */
+.square--sweep rect {
+  animation: claim var(--motion-slow) ease-out backwards;
+  animation-delay: calc(var(--claim-index, 0) * 22ms);
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+.overlay__eyebrow--earned {
+  color: var(--ink);
+}
+
+.overlay__series {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Longer runs read bigger. */
+.chain--t2 { font-size: 1.05rem; letter-spacing: 0.18em; }
+.chain--t3 { font-size: 1.25rem; letter-spacing: 0.22em; padding: var(--space-3) var(--space-5); }
+
+/* Chain vision: safe edges glow, sacrifices carry their cost. */
+.edge__safe {
+  stroke: #4ade80;
+  stroke-width: 9;
+  stroke-opacity: 0.35;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.edge__cost {
+  fill: var(--danger);
+  font-size: 13px;
+  font-weight: 800;
+  paint-order: stroke;
+  stroke: #0b0b0c;
+  stroke-width: 3;
+  pointer-events: none;
+}
+
+/* First-move hint: phones have no hover, so the gaps look inert until this. */
+.edge__ghost {
+  stroke: var(--ink-muted);
+  stroke-width: 4;
+  stroke-dasharray: 5 6;
+  stroke-opacity: 0.5;
+  stroke-linecap: round;
+  pointer-events: none;
+  animation: ghost-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes ghost-pulse {
+  0%, 100% { stroke-opacity: 0.2; }
+  50% { stroke-opacity: 0.65; }
+}
+
+.board__peek {
+  align-self: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .edge__ghost { animation: none; stroke-opacity: 0.5; }
+}
+
+/* Rematch and mode row --------------------------------------------------- */
+
+.overlay__rematch {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  text-align: center;
+}
+
+/* Three equal modes on one row — "vs Computer" used to drop to its own line
+   and read as a lesser option. */
+.setup__modes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+
+.setup__modes .button {
+  padding: var(--space-3) var(--space-2);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+}
+
+/* Phones: tighten everything so Start is reachable without a long scroll. */
+@media (max-width: 480px) {
+  .app {
+    gap: var(--space-2);
+  }
+
+  .app__header {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .app__title {
+    font-size: 11px;
+  }
+
+  .app__header-actions .button {
+    padding: 0 var(--space-2);
+    font-size: 0.6rem;
+    letter-spacing: 0.06em;
+  }
+
+  .setup {
+    padding: var(--space-4);
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+  }
+
+  .setup__header h1 {
+    font-size: 1.7rem;
+  }
+
+  .setup__header p {
+    font-size: 0.82rem;
+  }
+
+  .setup__player {
+    padding: var(--space-2) var(--space-3) var(--space-3);
+    gap: var(--space-2);
+  }
+
+  .field input {
+    min-height: 44px;
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .setup__options {
+    gap: var(--space-3);
+  }
+}
+
+/* The public lobby. Rows reuse .invite, so a listing and a direct invitation
+   read as the same object — which is what they are. */
+.lobby-browser__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.lobby-browser__list .invite {
+  margin: 0;
+}
+
+.setup__browse {
+  width: 100%;
+}

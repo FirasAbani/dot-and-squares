@@ -1,0 +1,10 @@
+import { chromium } from 'playwright';
+const out = new URL('../.playwright-shots/icon-1024.png', import.meta.url).pathname;
+const src = new URL('./icon.html', import.meta.url).href;
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 1024, height: 1024 }, deviceScaleFactor: 1 });
+await page.goto(src);
+await page.waitForTimeout(300);
+await page.screenshot({ path: out, omitBackground: true });
+await browser.close();
+console.log('wrote', out);

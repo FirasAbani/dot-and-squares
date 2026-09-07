@@ -1,0 +1,116 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      /* 1024x1024 app icon in the game's Bold Utility palette. */
+      html,
+      body {
+        margin: 0;
+        width: 1024px;
+        height: 1024px;
+      }
+      body {
+        background: transparent;
+        display: grid;
+        place-items: center;
+      }
+      /* macOS Big Sur icon grid: ~824px of content inside 1024, rounded. */
+      .plate {
+        width: 824px;
+        height: 824px;
+        border-radius: 185px;
+        background: #16171a;
+        box-shadow: inset 0 0 0 4px #34363c;
+        display: grid;
+        place-items: center;
+      }
+      .board {
+        position: relative;
+        width: 620px;
+        height: 620px;
+        transform: translate(-25px, -25px);
+      }
+      .dot {
+        position: absolute;
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: #8a8d94;
+      }
+      .line {
+        position: absolute;
+        border-radius: 999px;
+      }
+      .sq {
+        position: absolute;
+        display: grid;
+        place-items: center;
+        font: 800 92px/1 Archivo, 'Helvetica Neue', Helvetica, sans-serif;
+        letter-spacing: 0.06em;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="plate">
+      <div class="board" id="board"></div>
+    </div>
+    <script>
+      // A 3x3 dot grid: big enough to read at 32px, detailed enough at 1024.
+      const N = 3;
+      const P = 40;
+      const S = 270;
+      const T = 26;
+      const board = document.getElementById('board');
+      const px = (n) => `${n}px`;
+      const add = (cls, style) => {
+        const el = document.createElement('div');
+        el.className = cls;
+        Object.assign(el.style, style);
+        board.appendChild(el);
+        return el;
+      };
+
+      // One square claimed by each player, so both channels show: colour AND
+      // the solid/dashed distinction used on the real board.
+      add('sq', {
+        left: px(P),
+        top: px(P),
+        width: px(S),
+        height: px(S),
+        background: 'rgba(91, 156, 255, 0.22)',
+        color: '#bcd5ff',
+      }).textContent = 'AL';
+      add('sq', {
+        left: px(P + S),
+        top: px(P + S),
+        width: px(S),
+        height: px(S),
+        background: 'rgba(255, 176, 32, 0.22)',
+        color: '#ffd88a',
+      }).textContent = 'GH';
+
+      const solid = '#5b9cff';
+      const dashed = (dir) =>
+        `repeating-linear-gradient(${dir}, #ffb020 0 42px, rgba(0,0,0,0) 42px 68px)`;
+
+      // Player one's square: solid blue sides.
+      add('line', { left: px(P), top: px(P - T / 2), width: px(S), height: px(T), background: solid });
+      add('line', { left: px(P), top: px(P + S - T / 2), width: px(S), height: px(T), background: solid });
+      add('line', { left: px(P - T / 2), top: px(P), width: px(T), height: px(S), background: solid });
+      add('line', { left: px(P + S - T / 2), top: px(P), width: px(T), height: px(S), background: solid });
+
+      // Player two's square: dashed amber sides.
+      add('line', { left: px(P + S), top: px(P + S - T / 2), width: px(S), height: px(T), background: dashed('90deg') });
+      add('line', { left: px(P + S), top: px(P + 2 * S - T / 2), width: px(S), height: px(T), background: dashed('90deg') });
+      add('line', { left: px(P + S - T / 2), top: px(P + S), width: px(T), height: px(S), background: dashed('180deg') });
+      add('line', { left: px(P + 2 * S - T / 2), top: px(P + S), width: px(T), height: px(S), background: dashed('180deg') });
+
+      for (let r = 0; r < N; r++) {
+        for (let c = 0; c < N; c++) {
+          add('dot', { left: px(P + c * S - 13), top: px(P + r * S - 13) });
+        }
+      }
+    </script>
+  </body>
+</html>
