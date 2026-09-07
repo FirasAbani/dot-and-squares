@@ -6,6 +6,7 @@ dist/
 .wrangler/
 .playwright-shots/
 .claude/.spec-guard/
+.claude/.ship-guard/
 
 # Agent/probe scratch files must never be committed again.
 *-tmp.mjs
