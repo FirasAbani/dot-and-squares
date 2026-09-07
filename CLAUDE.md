@@ -35,6 +35,8 @@ to the app so a prefetch can't kill the game.
 | `npm run lobby-check` | drives the public lobby against a running `dev:worker` |
 | `npm run sim` | five-player scenario: two mid-game, two waiting, one choosing |
 | `npm run deploy` | Build and `wrangler deploy` to Cloudflare |
+| `npm run check-deployed` | Is the live site the build in `dist/`? (0 yes, 1 behind, 2 unknown) |
+| `npm run ship` | `deploy` then `check-deployed` — the safe way to release |
 
 ## Layout
 
@@ -75,6 +77,33 @@ Three more for the public lobby:
 For local dev run `npm run dev:worker` and `npm run dev` together — Vite proxies `/api`
 to :8787 with `ws: true`. If 8787 is taken by another project, set `WORKER_PORT` on **both**
 commands (it drives the wrangler port and the Vite proxy target alike).
+
+## Shipping — the desktop app shows the DEPLOYED build
+
+[scripts/launcher.sh](scripts/launcher.sh) opens
+`https://dots-and-squares.dots-and-squares.workers.dev`, deliberately: a locally served
+game hands out a `localhost` invite link nobody else can open, so pointing at production
+is what makes "send this link" work.
+
+The consequence is the trap that has already bitten once: **building is not shipping.**
+`npm run build` changes nothing a player sees, so after any change the desktop app keeps
+showing the old game until `npm run deploy` runs. Nothing about the app looks broken.
+
+Two guards now make that visible instead of silent:
+
+- **`npm run check-deployed`** compares the content-hashed asset names in `dist/index.html`
+  with the ones the live page serves, and probes `/api/lobby` as a capability check. Vite
+  hashes bundles by content, so the asset name *is* the build identity — no version
+  stamping to keep in sync. Exit 1 means players are behind.
+- **The launcher runs that check on every launch** and, if the site is behind, offers
+  "Deploy Now" before opening. Exit code 2 (offline, or no local build) never nags.
+
+**Use `npm run ship`, not `npm run deploy`** — it deploys and then verifies that players
+actually got it.
+
+After editing [scripts/launcher.sh](scripts/launcher.sh), copy it into the bundle
+(`cp scripts/launcher.sh ~/Desktop/"Dots & Squares.app"/Contents/MacOS/launch`) or rerun
+`npm run make-icon`; the app holds its own copy.
 
 ## Gotchas
 

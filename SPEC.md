@@ -561,7 +561,18 @@ Two lessons worth carrying into a rebuild:
 
 ## 10. Deployment
 
-`npm run deploy` = typecheck + build + `wrangler deploy`. One Worker serves the static SPA
+`npm run ship` = deploy, then verify the players actually got it. `npm run deploy` alone is
+typecheck + build + `wrangler deploy`.
+
+**Building is not shipping — INVARIANT.** The desktop launcher opens the *deployed* URL, so
+after any change the app keeps showing the old game until a deploy runs, and nothing looks
+broken. `npm run check-deployed` compares the content-hashed asset names in `dist/index.html`
+against the live page (Vite hashes by content, so the asset name is the build identity — no
+version stamp to keep in sync) and probes `/api/lobby` as a capability check. The launcher
+runs it at every launch and offers to deploy when the site is behind; "could not tell"
+(offline, or nothing built) never interrupts.
+
+ One Worker serves the static SPA
 and the multiplayer; the SPA fallback handles client routing; `/api/*` reaches the Worker
 first. Deploying is expected to be routine and repeated — verify against production after
 each deploy, not only locally.
@@ -609,3 +620,5 @@ rules to be rewritten when the server needs them.
     join retries forever behind a "reconnecting" spinner.
 15. A reload puts a second socket on a seat before the first one's close lands. A close
     must not report a player gone while another of their sockets is live.
+16. Building is not shipping: the desktop app shows the deployed build, so every change
+    needs a deploy before any player sees it.

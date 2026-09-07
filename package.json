@@ -16,7 +16,9 @@
     "browser-check": "node scripts/browser-check.mjs",
     "aim-check": "node scripts/aim-check.mjs",
     "lobby-check": "node scripts/lobby-check.mjs",
-    "sim": "node scripts/sim-five-players.mjs"
+    "sim": "node scripts/sim-five-players.mjs",
+    "check-deployed": "node scripts/check-deployed.mjs",
+    "ship": "npm run deploy && npm run check-deployed"
   },
   "dependencies": {
     "react": "^18.3.1",
