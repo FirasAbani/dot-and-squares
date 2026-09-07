@@ -92,6 +92,16 @@ export type JoinFailure = 'bad-code' | 'room-exists' | 'room-full' | 'room-close
  */
 export type RoomVisibility = 'public' | 'private';
 
+/**
+ * Room-code alphabet: no 0/O, no 1/I/L, because codes get read aloud and typed
+ * by hand. Shared with the worker so the server refuses what the client can
+ * never mint — otherwise a mistyped `0` for `O` silently resolves to a
+ * different Durable Object instead of failing fast.
+ */
+export const ROOM_CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+export const ROOM_CODE_LENGTH = 6;
+export const ROOM_CODE_PATTERN = /^[2-9A-HJKMNP-Z]{6}$/;
+
 /** One pending public game, as shown on the lobby screen. */
 export interface LobbyListing {
   code: string;

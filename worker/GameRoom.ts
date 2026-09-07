@@ -12,7 +12,7 @@
 import type { PlayerId } from '../src/engine';
 import type { ClientMessage, ServerMessage } from '../src/shared/protocol';
 import { LOBBY_SINGLETON, type Env } from './env';
-import { PROTOCOL_VERSION } from '../src/shared/protocol';
+import { PROTOCOL_VERSION, ROOM_CODE_PATTERN } from '../src/shared/protocol';
 import {
   emptyRoom,
   joinRoom,
@@ -28,7 +28,6 @@ interface Attachment {
   token: string;
 }
 
-const CODE_PATTERN = /^[A-Z0-9]{6}$/;
 /** Refuses an oversized frame rather than letting it throw inside a handler. */
 const MAX_FRAME_BYTES = 2048;
 
@@ -42,7 +41,7 @@ export class GameRoom implements DurableObject {
     const url = new URL(request.url);
     const code = (url.pathname.split('/').pop() ?? '').toUpperCase();
 
-    if (!CODE_PATTERN.test(code)) return plain(400, 'bad-code');
+    if (!ROOM_CODE_PATTERN.test(code)) return plain(400, 'bad-code');
     if (Number(url.searchParams.get('v')) !== PROTOCOL_VERSION) return plain(400, 'bad-version');
 
     // A preview for the join screen. Read-only: it never claims a seat, so a

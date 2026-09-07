@@ -63,6 +63,10 @@ Two invariants that keep it free and correct:
   duration forever. The clock uses a single alarm per turn at the flag deadline.
 - **Never assume turns alternate.** Claiming a square grants another turn; read
   `currentPlayer` from what `makeMove` returned.
+- **An alarm that renews state must advance `lastActivity`.** `nextAlarmAt` derives from it,
+  so renewing without bumping it re-arms in the past — the DO spins, and bills duration like
+  the interval rule 1 forbids. A test asserting only the renewal *effect* passes happily
+  while this burns; assert the next alarm moved forward.
 
 Three more for the public lobby:
 

@@ -141,7 +141,13 @@ function announce(state: LobbyState, msg: LobbyAnnounce, now: number): LobbyRedu
     [msg.listing.code]: { ...msg.listing, expiresAt: now + LISTING_TTL_MS },
   };
   const next = { ...state, listings };
-  return { state: next, effects: [snapshot(next, now, 'all')] };
+
+  // A renewal changes only the expiry, which no watcher can see. Broadcasting
+  // it anyway would wake every browser in the lobby on a timer, multiplied by
+  // the number of waiting hosts, to tell them nothing.
+  const unchanged =
+    JSON.stringify(visibleGames(state, now)) === JSON.stringify(visibleGames(next, now));
+  return { state: next, effects: unchanged ? [] : [snapshot(next, now, 'all')] };
 }
 
 /**

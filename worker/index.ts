@@ -5,6 +5,7 @@
  */
 import { GameRoom } from './GameRoom';
 import { LobbyRoom } from './LobbyRoom';
+import { ROOM_CODE_PATTERN } from '../src/shared/protocol';
 import { LOBBY_SINGLETON, type Env } from './env';
 
 export { GameRoom, LobbyRoom };
@@ -38,7 +39,10 @@ export default {
     // Normalise before deriving the id, so ABC234 and abc234 are one room.
     const code = match[1].toUpperCase();
     // Validating here means a malformed code never instantiates — and so never
-    // bills for — a Durable Object.
+    // bills for — a Durable Object. Checked against the real alphabet, so a
+    // confusable code (0 for O, 1 for I or L) is refused rather than quietly
+    // opening a different room.
+    if (!ROOM_CODE_PATTERN.test(code)) return new Response('bad-code', { status: 404 });
     const id = env.ROOM.idFromName(code);
     return env.ROOM.get(id).fetch(request);
   },

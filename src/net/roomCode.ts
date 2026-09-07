@@ -1,4 +1,10 @@
-import { PROTOCOL_VERSION, type RoomInfo } from '../shared/protocol';
+import {
+  PROTOCOL_VERSION,
+  ROOM_CODE_ALPHABET,
+  ROOM_CODE_LENGTH,
+  ROOM_CODE_PATTERN,
+  type RoomInfo,
+} from '../shared/protocol';
 
 /**
  * Room codes are generated in the browser and confirmed by the server, so
@@ -6,14 +12,14 @@ import { PROTOCOL_VERSION, type RoomInfo } from '../shared/protocol';
  * `create=1` and the server answers 409 if the code is already taken.
  */
 
-/** No 0/O, 1/I/L — codes get read aloud and typed by hand. */
-const ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
-export const CODE_LENGTH = 6;
+// The alphabet and the pattern live in shared/protocol.ts, so the server
+// refuses exactly what this cannot produce.
+export const CODE_LENGTH = ROOM_CODE_LENGTH;
 
 export function generateRoomCode(): string {
   const bytes = new Uint8Array(CODE_LENGTH);
   crypto.getRandomValues(bytes);
-  return Array.from(bytes, (byte) => ALPHABET[byte % ALPHABET.length]).join('');
+  return Array.from(bytes, (byte) => ROOM_CODE_ALPHABET[byte % ROOM_CODE_ALPHABET.length]).join('');
 }
 
 export function normaliseRoomCode(input: string): string {
@@ -21,7 +27,7 @@ export function normaliseRoomCode(input: string): string {
 }
 
 export function isValidRoomCode(code: string): boolean {
-  return new RegExp(`^[A-Z0-9]{${CODE_LENGTH}}$`).test(code);
+  return ROOM_CODE_PATTERN.test(code);
 }
 
 /**

@@ -348,8 +348,18 @@ export function reduceRoom(room: RoomState, event: RoomEvent): ReduceResult {
     }
     // A room still waiting for an opponent renews its listing rather than
     // letting the lobby's TTL quietly drop it.
+    //
+    // `lastActivity` MUST advance here. `nextAlarmAt` is derived from it, so a
+    // renewal that left it alone would re-arm the alarm at a moment already
+    // past — an alarm that re-fires the instant it is set, which is a spinning
+    // timer wearing an alarm's clothing and bills duration exactly like one.
     const listing = listingOf(room);
-    if (listing) return { room, effects: [{ lobby: { k: 'list', listing } }] };
+    if (listing) {
+      return {
+        room: { ...room, meta: { ...room.meta, lastActivity: event.now } },
+        effects: [{ lobby: { k: 'list', listing } }],
+      };
+    }
 
     const idle = event.now - room.meta.lastActivity > IDLE_REAP_MS;
     const nobodyHere = SEATS.every((seat) => !room.connected[seat]);

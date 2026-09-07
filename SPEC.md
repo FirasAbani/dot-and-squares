@@ -229,7 +229,9 @@ a Durable Object is both in one concept. Adding a storage product would buy neit
 ### 6.2 Room codes
 
 Six characters from `23456789ABCDEFGHJKMNPQRSTUVWXYZ` — **no 0/O, 1/I/L**, because codes
-get read aloud and typed by hand. Generated in the *browser* and confirmed by the server:
+get read aloud and typed by hand. The alphabet and its pattern live in `shared/protocol.ts`
+and the **server validates against them**, so a confusable code fails fast instead of
+quietly resolving to a different Durable Object than the one meant. Generated in the *browser* and confirmed by the server:
 creating a room costs no extra request, the upgrade carries `create=1`, and the server
 answers a conflict if the code is taken. Shared as `${origin}/?room=CODE`, which opens
 straight into the join screen.
@@ -336,7 +338,16 @@ Three independent nets remove a dead listing, fastest first:
 Announcements are fire-and-forget inside a `try/catch`: a failed announce must never break a
 game. A dropped `unlist` self-heals via the TTL; a dropped `list` cannot, so **a listed room
 re-announces itself on a renewal alarm** every 5 minutes — inside the 15-minute TTL, so a
-waiting host never expires off the list, and still one alarm. They are **awaited in effect order**, which is
+waiting host never expires off the list, and still one alarm.
+
+**A renewal MUST advance `lastActivity` — INVARIANT.** `nextAlarmAt` is derived from it, so
+renewing without touching it re-arms the alarm at a moment already past: the object wakes in
+a tight loop and bills duration exactly like the interval the free-tier rules forbid. It is a
+spinning timer wearing an alarm's clothing, and it looks correct in a test that asserts only
+the renewal *effect*. Assert that the next alarm moved **forward**.
+
+The lobby also stays silent when a renewal changes nothing a watcher can see — only the
+expiry moved — so waiting hosts do not wake every browser in the lobby on a timer. They are **awaited in effect order**, which is
 what stops a `list` landing after the `unlist` that followed it.
 
 Registration travels as an internal stub fetch to `https://lobby/announce`. Public lobby
@@ -622,3 +633,6 @@ rules to be rewritten when the server needs them.
     must not report a player gone while another of their sockets is live.
 16. Building is not shipping: the desktop app shows the deployed build, so every change
     needs a deploy before any player sees it.
+17. An alarm that renews state must move its own next deadline forward, or it is a timer.
+18. The server validates room codes against the real alphabet, so a confusable code cannot
+    open a different room.

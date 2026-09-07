@@ -264,3 +264,31 @@ describe('sanitising what a room announces', () => {
     });
   });
 });
+
+describe('staying quiet when nothing visible changed', () => {
+  it('does not wake every watcher for a renewal', () => {
+    const listed = list(emptyLobby(), 'ABC234', 1000).state;
+    // A renewal re-sends the SAME listing — the room's createdAt does not move,
+    // only the expiry the lobby derives, and no browser can see an expiry.
+    const renewed = list(listed, 'ABC234', 1000 + 5 * 60 * 1000, 1000);
+    expect(renewed.effects).toEqual([]);
+  });
+
+  it('still extends the listing even though it says nothing', () => {
+    const listed = list(emptyLobby(), 'ABC234', 1000).state;
+    const renewed = list(listed, 'ABC234', 600000, 1000).state;
+    expect(nextLobbyAlarmAt(renewed)).toBe(600000 + LISTING_TTL_MS);
+    expect(visibleGames(renewed, 600000)).toHaveLength(1);
+  });
+
+  it('does speak up when a renewal actually changes something', () => {
+    const listed = list(emptyLobby(), 'ABC234', 1000).state;
+    const renamed = reduceLobby(listed, {
+      k: 'announce',
+      announce: { k: 'list', listing: { ...listing('ABC234'), hostName: 'Grace' } },
+      now: 2000,
+    });
+    expect(renamed.effects).toHaveLength(1);
+    expect(gamesIn(renamed.effects)[0].hostName).toBe('Grace');
+  });
+});

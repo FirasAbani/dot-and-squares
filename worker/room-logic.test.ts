@@ -576,3 +576,51 @@ describe('a socket closing that is not a departure', () => {
     expect(listingOf(gone.room)).toBeNull();
   });
 });
+
+describe('renewing a listing without spinning', () => {
+  function waiting(now = 1000) {
+    const created = joinRoom(emptyRoom('ABC234', now), {
+      ...ada,
+      wantsCreate: true,
+      now,
+      visibility: 'public',
+    });
+    if (!created.ok) throw new Error(created.failure);
+    return created.room;
+  }
+
+  it('moves the next alarm forward, so it cannot re-fire immediately', () => {
+    const room = waiting();
+    const firstAt = nextAlarmAt(room);
+    const renewed = reduceRoom(room, { k: 'alarm', now: firstAt });
+
+    // The whole point: the new deadline is in the future relative to the alarm
+    // that just ran. Without this the DO wakes in a tight loop for ever.
+    expect(nextAlarmAt(renewed.room)).toBeGreaterThan(firstAt);
+    expect(nextAlarmAt(renewed.room)).toBe(firstAt + RENEW_LISTING_MS);
+  });
+
+  it('keeps moving forward across many renewals', () => {
+    let room = waiting();
+    let at = nextAlarmAt(room);
+    for (let i = 0; i < 20; i += 1) {
+      const next = reduceRoom(room, { k: 'alarm', now: at });
+      const then = nextAlarmAt(next.room);
+      expect(then).toBeGreaterThan(at);
+      room = next.room;
+      at = then;
+    }
+    // Twenty renewals is well over an hour of waiting, not twenty wake-ups in
+    // the same millisecond.
+    expect(at).toBe(1000 + 21 * RENEW_LISTING_MS);
+  });
+
+  it('still reaps a room once its host has actually gone', () => {
+    const room = waiting();
+    const gone = reduceRoom(room, { k: 'disconnect', seat: 'p1', now: 2000 });
+    // No listing any more, so no renewal keeping it alive artificially.
+    expect(nextAlarmAt(gone.room)).toBe(2000 + 24 * 60 * 60 * 1000);
+    const reaped = reduceRoom(gone.room, { k: 'alarm', now: 2000 + 25 * 60 * 60 * 1000 });
+    expect(reaped.effects.some((effect) => 'closeRoom' in effect)).toBe(true);
+  });
+});
