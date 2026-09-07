@@ -9,6 +9,8 @@ interface PublicLobbyProps {
   busyCode: string | null;
   notice: string | null;
   onJoin: (code: string, hostName: string) => void;
+  /** Stage a public game of your own and wait here for someone to take it. */
+  onStage: () => void;
   onBack: () => void;
 }
 
@@ -25,6 +27,7 @@ export function PublicLobby({
   busyCode,
   notice,
   onJoin,
+  onStage,
   onBack,
 }: PublicLobbyProps) {
   return (
@@ -52,7 +55,7 @@ export function PublicLobby({
 
       {status === 'open' && games.length === 0 && (
         <p className="setup__hint">
-          No open games right now — stage one and players will see it appear.
+          No open games right now — start one and you will be first in.
         </p>
       )}
 
@@ -99,9 +102,22 @@ export function PublicLobby({
         ))}
       </ul>
 
-      <button type="button" className="button" onClick={onBack}>
-        Back
-      </button>
+      {/* Being first here is a normal thing to be, not a dead end: staging
+          from the lobby leaves the player waiting in it rather than sending
+          them back to the setup screen to start again. */}
+      <div className="overlay__actions">
+        <button
+          type="button"
+          className="button button--primary"
+          disabled={busyCode !== null}
+          onClick={onStage}
+        >
+          Start a game and wait
+        </button>
+        <button type="button" className="button" onClick={onBack}>
+          Back
+        </button>
+      </div>
     </div>
   );
 }

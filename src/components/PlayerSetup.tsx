@@ -35,7 +35,7 @@ interface PlayerSetupProps {
   ) => void;
   onCreateRoom?: (player: PlayerSetupValues, options: MatchOptions) => void;
   onJoinRoom?: (code: string, player: PlayerSetupValues) => void;
-  onBrowseLobby?: (player: PlayerSetupValues) => void;
+  onBrowseLobby?: (player: PlayerSetupValues, options: MatchOptions) => void;
   /** Pre-filled from a ?room= link so a shared invite only asks for a name. */
   initialCode?: string;
   /** Where to land. Set when returning from the lobby, so Back does not
@@ -291,7 +291,14 @@ export function PlayerSetup({
               type="button"
               className="button setup__browse"
               disabled={!onlineValid}
-              onClick={() => onBrowseLobby?.(one)}
+              onClick={() =>
+                onBrowseLobby?.(one, {
+                  gridSize,
+                  timeControlMs: timeControl.ms,
+                  incrementMs: timeControl.incrementMs,
+                  visibility: 'public',
+                })
+              }
             >
               Browse open games
             </button>

@@ -19,6 +19,7 @@ function listing(code: string, hostName: string, over: Partial<LobbyListing> = {
 
 function renderLobby(over: Partial<React.ComponentProps<typeof PublicLobby>> = {}) {
   const onJoin = vi.fn();
+  const onStage = vi.fn();
   const onBack = vi.fn();
   render(
     <PublicLobby
@@ -27,11 +28,12 @@ function renderLobby(over: Partial<React.ComponentProps<typeof PublicLobby>> = {
       busyCode={null}
       notice={null}
       onJoin={onJoin}
+      onStage={onStage}
       onBack={onBack}
       {...over}
     />,
   );
-  return { onJoin, onBack };
+  return { onJoin, onStage, onBack };
 }
 
 describe('the public lobby', () => {
@@ -100,6 +102,26 @@ describe('the public lobby', () => {
   it('says when the lobby connection dropped', () => {
     renderLobby({ status: 'reconnecting' });
     expect(screen.getByRole('status').textContent).toMatch(/reconnecting/i);
+  });
+
+  it('lets the first player in start a game instead of dead-ending', async () => {
+    const { onStage } = renderLobby();
+    expect(screen.getByText(/start one and you will be first in/i)).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: /start a game and wait/i }));
+    expect(onStage).toHaveBeenCalled();
+  });
+
+  it('still offers to start one when other games are already listed', async () => {
+    const { onStage } = renderLobby({ games: [listing('AAA111', 'Ada')] });
+    await userEvent.click(screen.getByRole('button', { name: /start a game and wait/i }));
+    expect(onStage).toHaveBeenCalled();
+  });
+
+  it('holds the start button while a join is in flight', () => {
+    renderLobby({ games: [listing('AAA111', 'Ada')], busyCode: 'AAA111' });
+    expect(
+      (screen.getByRole('button', { name: /start a game and wait/i }) as HTMLButtonElement).disabled,
+    ).toBe(true);
   });
 
   it('offers a way back', async () => {

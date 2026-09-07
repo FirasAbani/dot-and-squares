@@ -5,7 +5,7 @@
  * that replaces the global WebSocket, and that stub must not leak into the
  * tests that know nothing about the network.
  */
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
@@ -236,6 +236,44 @@ describe('the public lobby, through the app', () => {
     await userEvent.click(screen.getByRole('button', { name: /cancel|leave/i }));
     expect(await screen.findByRole('button', { name: 'Create Room' })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: /open games/i })).toBeNull();
+  });
+
+  it('lets the first player in stage a game and wait there', async () => {
+    render(<App />);
+    await nameYourself();
+    await userEvent.click(screen.getByRole('button', { name: /Browse open games/ }));
+
+    const lobbySocket = FakeWebSocket.last();
+    act(() => {
+      lobbySocket.accept();
+      lobbySocket.emit({ t: 'lobby', games: [] });
+    });
+    expect(await screen.findByText(/start one and you will be first in/i)).toBeTruthy();
+
+    await userEvent.click(screen.getByRole('button', { name: /start a game and wait/i }));
+
+    // She becomes the host of a public room — and is told so as a host, with a
+    // code to share, not as someone joining a stranger's game.
+    const roomSocket = FakeWebSocket.last();
+    expect(roomSocket.url).toContain('create=1');
+    expect(roomSocket.url).toContain('pub=1');
+    expect(await screen.findByRole('heading', { name: /waiting/i })).toBeTruthy();
+    await waitFor(() => expect(lobbySocket.readyState).toBe(FakeWebSocket.CLOSED));
+  });
+
+  it('stages with the board and clock the player chose, not a default', async () => {
+    render(<App />);
+    await nameYourself();
+    // Move the board off its default before browsing.
+    fireEvent.change(screen.getByLabelText(/Board/), { target: { value: '8' } });
+    await userEvent.click(screen.getByRole('button', { name: /Browse open games/ }));
+    act(() => {
+      FakeWebSocket.last().accept();
+      FakeWebSocket.last().emit({ t: 'lobby', games: [] });
+    });
+    await userEvent.click(await screen.findByRole('button', { name: /start a game and wait/i }));
+
+    expect(FakeWebSocket.last().url).toContain('grid=8');
   });
 
   it('comes back to the setup screen from the lobby', async () => {
