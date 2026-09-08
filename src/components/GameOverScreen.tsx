@@ -158,10 +158,13 @@ export function GameOverScreen({
                 ? 'Asked…'
                 : 'Play Again'}
           </button>
-          {/* Named for where it goes: back to setup with the players' details
-              still filled in, so only the settings need changing. */}
+          {/* Named for where it goes. It was "Change Setup", which described a
+              thing you might do once you arrive rather than the destination —
+              so from a finished game against the computer there appeared to be
+              no way back to the menu at all, only Play Again or Quit. The
+              players' details are still filled in when you land there. */}
           <button type="button" className="button" onClick={onNewGame}>
-            Change Setup
+            Main Menu
           </button>
         </div>
 

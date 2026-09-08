@@ -493,8 +493,10 @@ its visible text (WCAG 2.5.3 Label in Name).
 ### 7.7 Persistence (browser)
 
 - `ds:players` (localStorage) — names and initials, so returning to setup never means
-  retyping. The end screen therefore offers **Change Setup**, which returns to setup with
-  the players already filled in.
+  retyping. The end screen therefore offers **Main Menu**, which returns to setup with
+  the players already filled in. Named for the destination, not for the errand: as
+  "Change Setup" it read as an errand, and a player finishing a game against the computer
+  saw only Play Again and Quit — no way back.
 - `ds:muted` (localStorage) — mute preference.
 - `ds:token:CODE` (sessionStorage) — the seat token, per §6.3.
 

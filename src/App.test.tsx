@@ -560,6 +560,41 @@ describe('the end screen speaks to the right player', () => {
     vi.restoreAllMocks();
   });
 
+  /**
+   * The reported gap: from a finished game against the computer, the only ways
+   * out looked like Play Again or Quit. There is a way back to the menu, and it
+   * has to be findable by its name.
+   */
+  it('offers a way back to the main menu when the game ends', async () => {
+    vi.useFakeTimers();
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: 'vs Computer' }));
+    fireEvent.change(screen.getAllByLabelText('Username')[0], { target: { value: 'Ada' } });
+    fireEvent.change(screen.getAllByLabelText('Initials')[0], { target: { value: 'AL' } });
+    // The smallest board, so the match actually finishes inside the loop below.
+    fireEvent.change(screen.getByLabelText(/Board/), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Play Computer' }));
+
+    for (let i = 0; i < 60; i += 1) {
+      if (screen.queryByRole('dialog', { name: 'Game over' })) break;
+      const target = document.querySelector('[data-edge-id]');
+      if (target) fireEvent.click(target);
+      await act(async () => {
+        vi.advanceTimersByTime(1000);
+      });
+    }
+    expect(screen.queryByRole('dialog', { name: 'Game over' })).toBeTruthy();
+
+    const back = screen.getByRole('button', { name: 'Main Menu' });
+    fireEvent.click(back);
+
+    // Back on the setup screen, with the name still filled in so a second game
+    // costs nothing to start.
+    expect(screen.queryByRole('dialog', { name: 'Game over' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Play Online' })).toBeTruthy();
+    expect((screen.getAllByLabelText('Username')[0] as HTMLInputElement).value).toBe('Ada');
+  });
+
   it('does not congratulate the winner to the loser', async () => {
     vi.useFakeTimers();
     render(<App />);
@@ -610,7 +645,7 @@ describe('returning to the setup screen', () => {
     }
     await screen.findByRole('dialog', { name: 'Game over' }, { timeout: 3000 });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Change Setup' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Main Menu' }));
 
     expect(startButton()).toBeTruthy();
     expect((screen.getAllByLabelText('Username')[0] as HTMLInputElement).value).toBe('Ada');
