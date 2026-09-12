@@ -428,7 +428,7 @@ describe('what Eve sees between clicking Join and the room answering', () => {
    *
    * `App.tsx:585` routes every `online && !activeState` render to <Lobby>, which
    * is written for the player who created the room: it says "Send this code to
-   * the other player", prints the room code, and offers "Copy link". Eve, who
+   * the other player", prints the room code, and offers "Invite a player". Eve, who
    * just joined Cara's game from the browse list, is told to invite somebody to
    * a game that already has both seats — and the code she is invited to share is
    * Cara's. In a deployed build this is however long the join round-trip takes.
@@ -443,7 +443,7 @@ describe('what Eve sees between clicking Join and the room answering', () => {
     // The room has not answered yet — this is the whole join round-trip.
     const panel = eve.root;
     expect(within(panel).queryByText(/send this code to the other player/i)).toBeNull();
-    expect(within(panel).queryByRole('button', { name: /copy link/i })).toBeNull();
+    expect(within(panel).queryByRole('button', { name: /invite a player/i })).toBeNull();
     expect(within(panel).queryByText(/waiting for the other player to join/i)).toBeNull();
   });
 

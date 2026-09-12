@@ -109,7 +109,7 @@ describe('the public lobby, through the app', () => {
     const room = FakeWebSocket.last();
     act(() => room.accept());
     expect(await screen.findByRole('heading', { name: /waiting/i })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /copy link/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /invite a player/i })).toBeTruthy();
   });
 
   it('will not let a nameless player browse', async () => {
@@ -266,10 +266,10 @@ describe('the public lobby, through the app', () => {
     });
 
     // A joiner is told they are joining — never handed the host's room code and
-    // a Copy link button for a game that is not theirs.
+    // an invite button for a game that is not theirs.
     expect(await screen.findByRole('heading', { name: /joining/i })).toBeTruthy();
     expect(screen.getByText(/taking a seat in grace's game/i)).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /copy link/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /invite a player/i })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: /cancel|leave/i }));
     expect(await screen.findByRole('button', { name: /Browse Open Games/ })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: /open games/i })).toBeNull();

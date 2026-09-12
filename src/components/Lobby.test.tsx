@@ -1,4 +1,5 @@
 import { act, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Lobby } from './Lobby';
 
@@ -20,7 +21,7 @@ describe('the waiting screen', () => {
 
   it('does not offer a code or a copy button for a room that never opened', () => {
     renderLobby({ status: 'closed', failure: 'room-full' });
-    expect(screen.queryByRole('button', { name: /Creating room|Copy link/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Creating room|Invite a player/ })).toBeNull();
     expect(screen.queryByText('······')).toBeNull();
     expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy();
   });
@@ -38,9 +39,9 @@ describe('the waiting screen', () => {
     expect(screen.getByRole('status').textContent).toMatch(/taking longer/i);
   });
 
-  it('says Copy link once the room is really open', () => {
+  it('offers the invitation once the room is really open', () => {
     renderLobby({ status: 'open' });
-    expect(screen.getByRole('button', { name: 'Copy link' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Invite a player' })).toBeTruthy();
     expect(screen.getByText('ABC234')).toBeTruthy();
     expect(screen.getByRole('status').textContent).toMatch(/waiting for the other player/i);
   });
@@ -49,6 +50,49 @@ describe('the waiting screen', () => {
     renderLobby({ status: 'connecting', isHost: false, hostName: 'Grace' });
     expect(screen.getByRole('heading', { name: 'Joining' })).toBeTruthy();
     expect(screen.getByText(/taking a seat in grace's game/i)).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /Copy link|Creating room/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Invite a player|Creating room/ })).toBeNull();
+  });
+});
+
+/**
+ * The waiting screen is the first moment a shareable link exists — the room
+ * code is created with the room. So this is where inviting belongs, and the
+ * button has to say what it does rather than how it does it.
+ */
+describe('inviting someone to a room that is waiting', () => {
+  afterEach(() => {
+    Reflect.deleteProperty(navigator, 'share');
+    vi.restoreAllMocks();
+  });
+
+  it('offers the invitation to a host, through the device share sheet', async () => {
+    const share = vi.fn(async () => {});
+    Object.defineProperty(navigator, 'share', { value: share, configurable: true });
+
+    render(<Lobby code="ABC234" status="open" onCancel={() => {}} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Invite a player' }));
+
+    expect(share).toHaveBeenCalled();
+    expect(await screen.findByRole('button', { name: 'Invitation sent' })).toBeTruthy();
+  });
+
+  it('says it copied when the browser has no share sheet', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: vi.fn(async () => {}) },
+      configurable: true,
+    });
+
+    render(<Lobby code="ABC234" status="open" onCancel={() => {}} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Invite a player' }));
+
+    expect(await screen.findByRole('button', { name: 'Invitation copied' })).toBeTruthy();
+  });
+
+  /** A joiner has no invitation of their own to give away. */
+  it('offers nothing to someone who is only taking a seat', () => {
+    render(
+      <Lobby code="ABC234" status="connecting" onCancel={() => {}} isHost={false} hostName="Ada" />,
+    );
+    expect(screen.queryByRole('button', { name: /invite/i })).toBeNull();
   });
 });

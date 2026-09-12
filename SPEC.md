@@ -414,9 +414,21 @@ softer alternatives because the board is the content and the chrome should not c
    answers with a seat — routing away the instant the socket opens, rather than waiting
    for the seat, flashes the host's Waiting screen (room code included) at the joiner for
    one frame before the real screen replaces it.
-3. **Waiting** — shown to the host: the room code and share link, revealed only once the
-   room is actually live (never publish a code before the server has confirmed it), with
-   clear waiting state. A public room says so, since someone may arrive at any moment. A
+3. **Waiting** — shown to the host: the room code and an **Invite a player** button,
+   revealed only once the room is actually live (never publish a code before the server
+   has confirmed it), with clear waiting state.
+
+   Inviting goes through the device's own share sheet (`navigator.share`), falling back to
+   the clipboard where there is none. This is deliberate, and it is the answer to "notify
+   my friend that a game is waiting": the friend has never opened this site, so nothing
+   installable in a browser can reach them — a notification and web push both require a
+   device that already visited and granted permission, which is precisely the person who
+   does not need inviting. Their phone already has an app that reaches them, so the
+   invitation leaves through that. A dismissed share sheet is not a failure and must not
+   copy to the clipboard behind the player's back.
+
+   The waiting screen is also the *first* moment a link can exist, since the room code is
+   created with the room — which is why there is no invite control on the staging panel. A public room says so, since someone may arrive at any moment. A
    **joiner** taking a seat sees a distinct variant of the same screen — "Joining" /
    "Taking a seat in {host}'s game…" — with no room code and no Copy link, since a joiner
    has no invite of their own to share and was previously shown the host's code by mistake.

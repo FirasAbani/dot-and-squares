@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { shareLink } from '../net/roomCode';
+import { offerInvite, type InviteOutcome } from '../net/invite';
 import type { JoinFailure } from '../shared/protocol';
 import type { ConnectionStatus } from '../net/useRemoteSession';
 
@@ -44,7 +44,7 @@ export function Lobby({
   hostName,
   failure = null,
 }: LobbyProps) {
-  const [copied, setCopied] = useState(false);
+  const [invited, setInvited] = useState<InviteOutcome | null>(null);
   const [slow, setSlow] = useState(false);
   const live = status === 'open';
   const failed = status === 'closed';
@@ -60,15 +60,13 @@ export function Lobby({
     return () => clearTimeout(timer);
   }, [status]);
 
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(shareLink(code));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Clipboard access can be refused; the code is on screen to read out.
-      setCopied(false);
-    }
+  const invite = async () => {
+    const outcome = await offerInvite(code, hostName ?? undefined);
+    // Nothing is said about a sheet the player dismissed: they saw it, they
+    // changed their mind, and a message about it would be noise.
+    if (outcome === 'dismissed') return;
+    setInvited(outcome);
+    setTimeout(() => setInvited(null), 2500);
   };
 
   return (
@@ -92,14 +90,31 @@ export function Lobby({
 
       <div className="overlay__actions">
         {isHost && !failed && (
-          <button type="button" className="button button--primary" onClick={copy} disabled={!live}>
-            {copied ? 'Link copied' : live ? 'Copy link' : 'Creating room…'}
+          <button
+            type="button"
+            className="button button--primary"
+            onClick={invite}
+            disabled={!live}
+          >
+            {!live
+              ? 'Creating room…'
+              : invited === 'shared'
+                ? 'Invitation sent'
+                : invited === 'copied'
+                  ? 'Invitation copied'
+                  : 'Invite a player'}
           </button>
         )}
         <button type="button" className="button" onClick={onCancel}>
           {failed ? 'Back' : 'Cancel'}
         </button>
       </div>
+
+      {isHost && invited === 'failed' && (
+        <p className="setup__hint" role="alert">
+          Could not open the share sheet — read out the code above instead.
+        </p>
+      )}
 
       {failed ? (
         <p className="setup__hint" role="alert">
