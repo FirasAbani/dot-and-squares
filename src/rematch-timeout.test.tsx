@@ -17,7 +17,9 @@ function finishedGame() {
 async function seatedAt(seat: 'p1' | 'p2') {
   render(<App />);
   await userEvent.click(screen.getByRole('button', { name: 'Play Online' }));
-  await userEvent.type(screen.getByLabelText(/username/i), seat === 'p1' ? 'Alice' : 'Bob');
+  const name = screen.getByLabelText(/username/i) as HTMLInputElement;
+  await userEvent.clear(name);
+  await userEvent.type(name, seat === 'p1' ? 'Alice' : 'Bob');
   const ini = screen.getByLabelText(/initials/i) as HTMLInputElement;
   await userEvent.clear(ini);
   await userEvent.type(ini, seat === 'p1' ? 'AL' : 'BO');

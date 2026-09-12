@@ -64,7 +64,12 @@ function mount() {
 
 async function goOnline(root: HTMLElement, username: string, initials: string) {
   await userEvent.click(within(root).getByRole('button', { name: 'Play Online' }));
-  await userEvent.type(within(root).getByLabelText(/username/i), username);
+  // Cleared first: the setup screen remembers the last player, so typing into a
+  // field that still holds "Ada" produces "AdaEve" and every later assertion
+  // about this player's name quietly stops matching.
+  const name = within(root).getByLabelText(/username/i) as HTMLInputElement;
+  await userEvent.clear(name);
+  await userEvent.type(name, username);
   const field = within(root).getByLabelText(/initials/i) as HTMLInputElement;
   await userEvent.clear(field);
   await userEvent.type(field, initials);

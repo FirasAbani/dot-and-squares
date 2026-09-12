@@ -26,7 +26,9 @@ function listing(code: string, hostName: string): LobbyListing {
 
 async function nameYourself() {
   await userEvent.click(screen.getByRole('button', { name: 'Play Online' }));
-  await userEvent.type(screen.getByLabelText(/username/i), 'Ada');
+  const name = screen.getByLabelText(/username/i) as HTMLInputElement;
+  await userEvent.clear(name);
+  await userEvent.type(name, 'Ada');
   const initials = screen.getByLabelText(/initials/i) as HTMLInputElement;
   await userEvent.clear(initials);
   await userEvent.type(initials, 'AL');
