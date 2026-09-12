@@ -40,6 +40,11 @@ jobs:
       - name: Install
         run: npm ci
 
+      # Errors fail the build; warnings do not. `eslint .` exits 0 on warnings
+      # by design — a warning is a thing to look at, not a thing to stop on.
+      - name: Lint
+        run: npm run lint
+
       # Both projects — the client and the Worker have separate tsconfigs, and
       # only checking one lets the other rot.
       - name: Typecheck

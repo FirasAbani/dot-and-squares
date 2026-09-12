@@ -27,11 +27,6 @@ const dotX = (c) => PADDING + c * SPACING;
 const dotY = (r) => PADDING + r * SPACING;
 
 let fails = 0;
-const claimed = async () => {
-  const ids = await p.$$eval('.edge--claimed', (ns) => ns.map((n) => n.getAttribute('data-claim') ?? ''));
-  return ids;
-};
-
 // Aim points: board coords, and the line that SHOULD be claimed. Each case
 // targets a different edge — a claimed line is no longer selectable, so reusing
 // one would test the wrong thing.
