@@ -5,7 +5,7 @@ import {
   timeControlFor,
   type PlayerSetup as PlayerSetupValues,
 } from '../engine';
-import { fetchRoomInfo, isValidRoomCode, normaliseRoomCode } from '../net/roomCode';
+import { fetchRoomInfo, heldSeatToken, isValidRoomCode, normaliseRoomCode } from '../net/roomCode';
 import type { RoomInfo, RoomVisibility } from '../shared/protocol';
 import { DIFFICULTIES, type Difficulty } from '../ai/bot';
 import { MatchOptionsFields } from './MatchOptionsFields';
@@ -137,6 +137,20 @@ export function PlayerSetup({
   const isValid =
     mode === 'local' ? onlineValid && Object.keys(errorsTwo).length === 0 : onlineValid;
   const canJoin = onlineValid && isValidRoomCode(normaliseRoomCode(code));
+
+  /**
+   * A seat we still hold in this room. A seat is claimed, not released, while
+   * its player is away — that is what lets them come back — so the room reports
+   * itself full and this screen used to refuse the very player it was holding
+   * the seat for. Re-entering the code, or opening the invite link, both landed
+   * on "That game already has two players" and there was no way back into your
+   * own match.
+   *
+   * The room reclaims a known token and hands back the same seat. So this
+   * preflight must not refuse on `full` alone: like a lobby row, it is a cache,
+   * and the room is the authority.
+   */
+  const returning = joining && heldSeatToken(normaliseRoomCode(code)) !== null;
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -291,17 +305,27 @@ export function PlayerSetup({
             </p>
           )}
 
-          {joining && !checking && invite?.full && (
+          {joining && !checking && invite?.full && !returning && (
             <p className="setup__hint" role="alert">
               That game already has two players.
             </p>
           )}
 
-          {joining && !checking && invite?.exists && !invite.full && (
+          {joining && !checking && invite?.exists && (!invite.full || returning) && (
             <div className="invite" role="group" aria-label="Match invitation">
-              <p className="invite__eyebrow">You have been invited</p>
+              <p className="invite__eyebrow">
+                {returning ? 'Your game is still there' : 'You have been invited'}
+              </p>
               <p className="invite__host">
-                <strong>{invite.hostName}</strong> wants to play
+                {returning ? (
+                  <>
+                    Rejoin <strong>{invite.hostName}</strong>
+                  </>
+                ) : (
+                  <>
+                    <strong>{invite.hostName}</strong> wants to play
+                  </>
+                )}
               </p>
               <dl className="invite__facts">
                 <div>
@@ -331,7 +355,7 @@ export function PlayerSetup({
                   disabled={!canJoin}
                   onClick={() => onJoinRoom?.(normaliseRoomCode(code), one)}
                 >
-                  Accept &amp; Play
+                  {returning ? 'Rejoin Game' : 'Accept & Play'}
                 </button>
               </div>
               {!onlineValid && <p className="board__hint">Enter your name above to accept.</p>}

@@ -547,11 +547,22 @@ export default function App() {
 
   const stoppable = canStopServer();
 
+  /**
+   * What Quit does, decided once.
+   *
+   * Only a local dev server can actually be stopped; in a deployed build there
+   * is no process to kill, so quitting means leaving the game. This used to be
+   * decided at each call site, and the Game over dialog's copy forgot the
+   * condition — it set `quitPhase` in production, where the confirm overlay
+   * renders nothing, so the dialog vanished and left a dead screen behind it.
+   */
+  const quitAction = stoppable ? () => setQuitPhase('confirming') : newGame;
+
   const quitButton = (
     <button
       type="button"
       className="button button--ghost button--danger"
-      onClick={stoppable ? () => setQuitPhase('confirming') : newGame}
+      onClick={quitAction}
     >
       {stoppable ? 'Quit' : 'Leave Game'}
     </button>
@@ -916,7 +927,7 @@ export default function App() {
           }}
           onPlayAgain={online ? remote.requestRematch : playAgain}
           onNewGame={online ? leaveOnline : newGame}
-          onQuit={online ? leaveOnline : () => setQuitPhase('confirming')}
+          onQuit={online ? leaveOnline : quitAction}
         />
       )}
 

@@ -174,6 +174,11 @@ describe('five players around one public lobby', () => {
 
     const bobRoot = mount();
     await goOnline(bobRoot, 'Bob', 'BO');
+    // Bob is a different browser, so he does not hold Alice's seat token. This
+    // suite runs five "players" in one jsdom, which means one sessionStorage —
+    // and a code we hold a token for is now correctly offered as a rejoin
+    // rather than an invitation. Dropping it here restores the real separation.
+    sessionStorage.removeItem(`ds:token:${alice.code}`);
     await userEvent.type(within(bobRoot).getByLabelText(/Have a code/i), alice.code);
     await userEvent.click(await within(bobRoot).findByRole('button', { name: /Accept/ }));
     act(() => {

@@ -43,6 +43,24 @@ export function isValidRoomCode(code: string): boolean {
  * Known edge: duplicating a tab copies `sessionStorage` in some browsers, which
  * reproduces the clash. Open a new window rather than duplicating one.
  */
+/**
+ * The token we already hold for a room, or null — WITHOUT minting one.
+ *
+ * `seatToken` creates on miss, which is right when connecting and wrong when
+ * asking "have I been here before?": calling it to find out would answer yes
+ * every time. The answer matters because a seat stays claimed while its player
+ * is away, so a room containing your own disconnected seat reports itself full,
+ * and the only thing that distinguishes you from a stranger is this token.
+ */
+export function heldSeatToken(code: string): string | null {
+  try {
+    return sessionStorage.getItem(`ds:token:${code}`);
+  } catch {
+    // Blocked storage: we cannot prove we were here, so we are a stranger.
+    return null;
+  }
+}
+
 export function seatToken(code: string): string {
   const key = `ds:token:${code}`;
   try {

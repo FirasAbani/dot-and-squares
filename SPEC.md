@@ -414,6 +414,17 @@ softer alternatives because the board is the content and the chrome should not c
    answers with a seat — routing away the instant the socket opens, rather than waiting
    for the seat, flashes the host's Waiting screen (room code included) at the joiner for
    one frame before the real screen replaces it.
+   **A full room is not a closed door to the player whose seat it is.** A seat stays
+   claimed while its player is away — that is what lets them return — so `roomInfo`
+   reports the room full, and this screen used to refuse the very player it was holding
+   the seat for: re-entering the code, or reopening the invite link, both said "That game
+   already has two players" and the match became unreachable while the opponent waited
+   for a return the UI made impossible. The preflight is a cache exactly like a lobby
+   row, and the room is the authority — `reduceRoom` reclaims a known token and hands
+   back the same seat. So `full` refuses only a stranger: a client holding
+   `ds:token:CODE` for that room is offered **Rejoin Game** instead. Checking for that
+   token must not mint one, which is why `heldSeatToken` exists alongside `seatToken`.
+
 3. **Waiting** — shown to the host: the room code and an **Invite a player** button,
    revealed only once the room is actually live (never publish a code before the server
    has confirmed it), with clear waiting state.
@@ -517,7 +528,8 @@ its visible text (WCAG 2.5.3 Label in Name).
   "Change Setup" it read as an errand, and a player finishing a game against the computer
   saw only Play Again and Quit — no way back.
 - `ds:muted` (localStorage) — mute preference.
-- `ds:token:CODE` (sessionStorage) — the seat token, per §6.3.
+- `ds:token:CODE` (sessionStorage) — the seat token, per §6.3. Also the only thing that
+  distinguishes a player returning to their own seat from a stranger at a full room.
 
 Initials are **never auto-derived from the name** — an explicit product decision.
 
