@@ -6,6 +6,7 @@
  * in plain node with no Workers runtime, no sockets and no storage — the same
  * discipline that makes the game engine cheap to test.
  */
+import { ROOM_LIMIT, spend, type Bucket } from './rate-limit';
 import {
   agreeDraw,
   createGame,
@@ -338,7 +339,7 @@ export function joinRoom(room: RoomState, req: JoinRequest): JoinResult {
 }
 
 export type RoomEvent =
-  | { k: 'message'; seat: PlayerId; msg: ClientMessage; now: number }
+  | { k: 'message'; seat: PlayerId; msg: ClientMessage; now: number; bucket?: Bucket }
   /**
    * `stillHere` is set when the seat has another live socket — a reload lands
    * its new socket before the old one's close is processed. Without it the
@@ -351,6 +352,12 @@ export type RoomEvent =
 export interface ReduceResult {
   room: RoomState;
   effects: Effect[];
+  /**
+   * The sender's rate-limit bucket after this frame, when the event carried
+   * one. The caller writes it back to the socket; the reducer stays pure and
+   * room state stays free of anything rebuilt from storage on every request.
+   */
+  bucket?: Bucket;
 }
 
 const IDLE_REAP_MS = 24 * 60 * 60 * 1000;
@@ -368,6 +375,27 @@ export const REMATCH_TIMEOUT_MS = 5000;
 export const RENEW_LISTING_MS = 5 * 60 * 1000;
 
 export function reduceRoom(room: RoomState, event: RoomEvent): ReduceResult {
+  // Before anything else a frame could cost. A refused frame must not touch the
+  // game, must not write storage and must not move `lastActivity` — otherwise a
+  // flood keeps the room alive for ever by being refused.
+  if (event.k === 'message') {
+    const { bucket, ok } = spend(event.bucket, event.now, ROOM_LIMIT);
+    if (!ok) {
+      return {
+        room,
+        bucket,
+        effects: [
+          {
+            to: 'sender',
+            msg: { t: 'error', code: 'rate-limited', message: 'Too many messages — slow down' },
+          },
+        ],
+      };
+    }
+    const result = reduceMessageOrAlarm(room, event);
+    return { ...result, bucket };
+  }
+
   if (event.k === 'disconnect') {
     const next: RoomState = {
       ...room,
@@ -384,6 +412,17 @@ export function reduceRoom(room: RoomState, event: RoomEvent): ReduceResult {
     };
   }
 
+  return reduceMessageOrAlarm(room, event);
+}
+
+/**
+ * Everything a message or an alarm does. Disconnects and the rate-limit guard
+ * are handled above, so this half never has to think about either.
+ */
+function reduceMessageOrAlarm(
+  room: RoomState,
+  event: Exclude<RoomEvent, { k: 'disconnect' }>,
+): ReduceResult {
   if (event.k === 'alarm') {
     // The clock is authoritative here, not on any client: if the flag has
     // fallen the game ends now, whatever either browser thinks.

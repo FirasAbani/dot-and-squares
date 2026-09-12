@@ -778,3 +778,68 @@ describe('a rematch nobody answers', () => {
     expect(timedOut.effects).toEqual([{ to: 'all', msg: { t: 'rematch-timeout' } }]);
   });
 });
+
+/**
+ * A flood costs real money: each frame runs game logic, writes storage and sets
+ * an alarm. Nothing stopped one client sending them as fast as it could.
+ */
+describe('a client sending frames faster than anyone plays', () => {
+  it('refuses the frame once the bucket is empty, and says why', () => {
+    const room = started();
+    let bucket;
+    let last;
+    // Well past the burst ceiling, all at the same instant.
+    for (let i = 0; i < 60; i += 1) {
+      last = reduceRoom(room, { k: 'message', seat: 'p1', msg: { t: 'resign' }, now: 5000, bucket });
+      bucket = last.bucket;
+    }
+    const error = last!.effects.find(
+      (e) => 'to' in e && e.msg.t === 'error',
+    ) as { msg: { code: string } } | undefined;
+    expect(error?.msg.code).toBe('rate-limited');
+  });
+
+  /**
+   * A refused frame must change nothing. If it moved `lastActivity` the room
+   * would be kept alive for ever by being attacked, which is the opposite of
+   * what a limit is for.
+   */
+  it('leaves the game and the idle deadline untouched when it refuses', () => {
+    const room = started();
+    const before = room;
+    let bucket;
+    let result = reduceRoom(room, { k: 'message', seat: 'p1', msg: { t: 'resign' }, now: 5000, bucket });
+    bucket = result.bucket;
+    // Drain whatever is left, then check the room past the ceiling.
+    for (let i = 0; i < 60; i += 1) {
+      result = reduceRoom(before, { k: 'message', seat: 'p1', msg: { t: 'resign' }, now: 5000, bucket });
+      bucket = result.bucket;
+    }
+    expect(result.room).toBe(before);
+    expect(result.room.meta.lastActivity).toBe(before.meta.lastActivity);
+    expect(nextAlarmAt(result.room)).toBe(nextAlarmAt(before));
+  });
+
+  it('does not throttle the other player', () => {
+    const room = started();
+    let mine;
+    for (let i = 0; i < 60; i += 1) {
+      mine = reduceRoom(room, { k: 'message', seat: 'p1', msg: { t: 'resign' }, now: 5000, bucket: mine?.bucket });
+    }
+    // p2's own bucket is untouched — buckets ride the socket, not the room.
+    const theirs = reduceRoom(room, { k: 'message', seat: 'p2', msg: { t: 'resign' }, now: 5000 });
+    expect(theirs.effects.some((e) => 'to' in e && e.msg.t === 'error')).toBe(false);
+  });
+
+  it('lets a normal game through untouched', () => {
+    const room = started();
+    const result = reduceRoom(room, {
+      k: 'message',
+      seat: 'p1',
+      msg: { t: 'move', edgeId: horizontalEdgeId(0, 0) },
+      now: 2000,
+    });
+    expect(result.effects.some((e) => 'to' in e && e.msg.t === 'error')).toBe(false);
+    expect(result.bucket).toBeDefined();
+  });
+});

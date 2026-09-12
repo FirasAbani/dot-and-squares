@@ -71,7 +71,7 @@ export type ServerMessage =
    */
   | { t: 'rematch-timeout' }
   | { t: 'rejected'; reason: RejectionReason }
-  | { t: 'error'; code: 'room-closed' | 'bad-message'; message: string };
+  | { t: 'error'; code: 'room-closed' | 'bad-message' | 'rate-limited'; message: string };
 
 /**
  * A preview of a room, fetched over plain HTTP before joining. Lets the second
@@ -128,7 +128,7 @@ export type LobbyServerMessage =
    * then heals itself on the next broadcast instead of needing reconciliation.
    */
   | { t: 'lobby'; games: LobbyListing[] }
-  | { t: 'error'; code: 'bad-message'; message: string };
+  | { t: 'error'; code: 'bad-message' | 'rate-limited'; message: string };
 
 /**
  * Room to lobby, carried on an internal stub fetch. Never routed from the

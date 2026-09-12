@@ -6,6 +6,7 @@
  * grant a seat. A stale row therefore costs one friendly refusal, never a
  * wrong game, which is what lets every write here be advisory and cheap.
  */
+import { LOBBY_LIMIT, spend, type Bucket } from './rate-limit';
 import type {
   LobbyAnnounce,
   LobbyClientMessage,
@@ -35,7 +36,7 @@ export interface LobbyState {
 
 export type LobbyEvent =
   | { k: 'announce'; announce: LobbyAnnounce; now: number }
-  | { k: 'message'; msg: LobbyClientMessage; now: number }
+  | { k: 'message'; msg: LobbyClientMessage; now: number; bucket?: Bucket }
   | { k: 'connect'; now: number }
   | { k: 'alarm'; now: number };
 
@@ -44,6 +45,8 @@ export type LobbyEffect = { to: 'all' | 'sender'; msg: LobbyServerMessage };
 export interface LobbyReduceResult {
   state: LobbyState;
   effects: LobbyEffect[];
+  /** The sender's bucket after this frame; the caller writes it back. */
+  bucket?: Bucket;
 }
 
 /**
@@ -93,15 +96,32 @@ export function reduceLobby(state: LobbyState, event: LobbyEvent): LobbyReduceRe
       return { state, effects: [snapshot(state, event.now, 'sender')] };
 
     case 'message': {
+      // A refresh serialises every listing for the asker. The feed is pushed
+      // anyway, so asking is a convenience — and one worth paying for at a
+      // sane rate rather than as fast as a loop can ask.
+      const { bucket, ok } = spend(event.bucket, event.now, LOBBY_LIMIT);
+      if (!ok) {
+        return {
+          state,
+          bucket,
+          effects: [
+            {
+              to: 'sender',
+              msg: { t: 'error', code: 'rate-limited', message: 'Too many refreshes' },
+            },
+          ],
+        };
+      }
       if (event.msg?.t !== 'refresh') {
         return {
           state,
+          bucket,
           effects: [
             { to: 'sender', msg: { t: 'error', code: 'bad-message', message: 'Unknown type' } },
           ],
         };
       }
-      return { state, effects: [snapshot(state, event.now, 'sender')] };
+      return { state, bucket, effects: [snapshot(state, event.now, 'sender')] };
     }
 
     case 'announce':

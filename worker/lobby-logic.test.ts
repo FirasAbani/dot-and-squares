@@ -292,3 +292,49 @@ describe('staying quiet when nothing visible changed', () => {
     expect(gamesIn(renamed.effects)[0].hostName).toBe('Grace');
   });
 });
+
+/**
+ * A refresh serialises every listing for the asker. The feed is pushed anyway,
+ * so asking is a convenience — and one that must cost something to abuse.
+ */
+describe('a client refreshing the lobby in a loop', () => {
+  it('refuses once the bucket is empty, and says why', () => {
+    let state = emptyLobby();
+    let bucket;
+    let last;
+    for (let i = 0; i < 30; i += 1) {
+      last = reduceLobby(state, { k: 'message', msg: { t: 'refresh' }, now: 1000, bucket });
+      state = last.state;
+      bucket = last.bucket;
+    }
+    const error = last!.effects.find((e) => e.msg.t === 'error') as
+      | { msg: { code: string } }
+      | undefined;
+    expect(error?.msg.code).toBe('rate-limited');
+  });
+
+  it('still answers a refresh at a human rate', () => {
+    let bucket;
+    let refused = 0;
+    for (let i = 0; i < 20; i += 1) {
+      const result = reduceLobby(emptyLobby(), {
+        k: 'message',
+        msg: { t: 'refresh' },
+        now: i * 2000,
+        bucket,
+      });
+      bucket = result.bucket;
+      if (result.effects.some((e) => e.msg.t === 'error')) refused += 1;
+    }
+    expect(refused).toBe(0);
+  });
+
+  /** A push to everyone must never be charged to whoever happened to ask. */
+  it('does not rate-limit an announce from a room', () => {
+    let state = emptyLobby();
+    for (let i = 0; i < 30; i += 1) {
+      state = list(state, 'ABC234', 1000 + i).state;
+    }
+    expect(Object.keys(state.listings)).toHaveLength(1);
+  });
+});

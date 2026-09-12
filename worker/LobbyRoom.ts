@@ -8,6 +8,7 @@
  */
 import type { LobbyAnnounce, LobbyClientMessage, LobbyServerMessage } from '../src/shared/protocol';
 import { PROTOCOL_VERSION } from '../src/shared/protocol';
+import type { Bucket } from './rate-limit';
 import {
   emptyLobby,
   sanitiseAnnounce,
@@ -76,7 +77,14 @@ export class LobbyRoom implements DurableObject {
     }
 
     const state = await this.load();
-    const { effects } = reduceLobby(state, { k: 'message', msg, now: Date.now() });
+    const rate = (ws.deserializeAttachment() as { rate?: Bucket } | null)?.rate;
+    const { effects, bucket } = reduceLobby(state, {
+      k: 'message',
+      msg,
+      now: Date.now(),
+      bucket: rate,
+    });
+    if (bucket) ws.serializeAttachment({ rate: bucket });
     this.dispatch(effects, ws);
   }
 

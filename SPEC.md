@@ -372,6 +372,33 @@ Being first into a game is a normal thing to be, so this is a better answer than
 
 ---
 
+### 6.9 Rate limiting — INVARIANT
+
+Every socket frame that reaches a reducer costs duration: the room runs game logic,
+writes storage and sets an alarm; the lobby serialises its whole listing set. On a plan
+billed by duration, a client sending those in a loop is the cheapest attack there is —
+no bug required.
+
+A pure token bucket (`worker/rate-limit.ts`) guards both reducers. Rooms allow a burst of
+40 refilling at 15/second; lobby refreshes allow 10 refilling at 1/second. Real play is
+nowhere near either.
+
+Three properties the tests pin, each of which is a way to get this wrong:
+
+- **The bucket lives on the socket attachment, never in room state.** Room state is
+  rebuilt from storage on every request, so a counter kept there resets with each frame
+  and limits nothing.
+- **A refused frame changes nothing** — not the game, and above all not `lastActivity`.
+  Moving it would mean a flood keeps the room alive for ever by being refused, which is
+  the opposite of the point.
+- **Elapsed time refills the bucket; no timer does.** That keeps §6 rule 1 intact, and an
+  idle connection arrives with a full bucket. Time is floored at zero so a clock that
+  jumps backwards cannot mint tokens.
+
+Per connection, not per room: one player flooding must never throttle their opponent.
+
+---
+
 ## 7. Interface
 
 ### 7.1 Design language — "Bold Utility"

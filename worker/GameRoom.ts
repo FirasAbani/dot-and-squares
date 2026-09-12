@@ -9,6 +9,7 @@
  *      messages, so per-socket state rides in `serializeAttachment` and room
  *      state in storage.
  */
+import type { Bucket } from './rate-limit';
 import type { PlayerId } from '../src/engine';
 import type { ClientMessage, ServerMessage } from '../src/shared/protocol';
 import { LOBBY_SINGLETON, type Env } from './env';
@@ -26,6 +27,8 @@ import {
 interface Attachment {
   seat: PlayerId;
   token: string;
+  /** Rate-limit bucket. Per socket, so one flooder cannot throttle the other. */
+  rate?: Bucket;
 }
 
 /** Refuses an oversized frame rather than letting it throw inside a handler. */
@@ -130,12 +133,21 @@ export class GameRoom implements DurableObject {
 
     const now = Date.now();
     const room = await this.load('', now);
-    const { room: next, effects } = reduceRoom(room, {
+    const {
+      room: next,
+      effects,
+      bucket,
+    } = reduceRoom(room, {
       k: 'message',
       seat: attachment.seat,
       msg,
       now,
+      bucket: attachment.rate,
     });
+
+    // Written back before anything else can fail: a refused frame that forgot
+    // to spend its token is not a limit at all.
+    if (bucket) ws.serializeAttachment({ ...attachment, rate: bucket });
 
     await this.save(next);
     this.dispatch(next, effects, ws);
