@@ -3,10 +3,8 @@ import { GameBoard } from './components/GameBoard';
 import { GameOverScreen, type MatchHighlights } from './components/GameOverScreen';
 import { Lobby } from './components/Lobby';
 import { PublicLobby } from './components/PublicLobby';
-import { useLobbyFeed } from './net/useLobbyFeed';
 import { PlayerSetup, type MatchOptions } from './components/PlayerSetup';
-import { generateRoomCode } from './net/roomCode';
-import { useRemoteSession } from './net/useRemoteSession';
+import { useOnlineMatch } from './net/useOnlineMatch';
 import { QuitScreen } from './components/QuitScreen';
 import { Scoreboard } from './components/Scoreboard';
 import { PLAYER_THEME } from './components/theme';
@@ -105,25 +103,32 @@ function savePlayers(one: PlayerSetupValues, two: PlayerSetupValues): void {
 export default function App() {
   const [match, setMatch] = useState<Match | null>(null);
   const [state, setState] = useState<GameState | null>(null);
-  const [online, setOnline] = useState(false);
   const [savedPlayers, setSavedPlayers] = useState(loadPlayers);
-  const remote = useRemoteSession();
-  const lobby = useLobbyFeed();
-  const [browsing, setBrowsing] = useState(false);
-  const [browsePlayer, setBrowsePlayer] = useState<PlayerSetupValues | null>(null);
-  const [busyCode, setBusyCode] = useState<string | null>(null);
-  const [lobbyNotice, setLobbyNotice] = useState<string | null>(null);
-  /**
-   * Rows the lobby is still advertising but that refused us on the way in. The
-   * feed is the server's view; this is what we have actually proven. Without it
-   * a dead row stays on screen and the second click looks exactly like the
-   * first — which is what "nothing happened" felt like.
-   */
-  const [deadCodes, setDeadCodes] = useState<string[]>([]);
-  /** Explains, back on the setup screen, why a match ended without a rematch. */
-  const [matchEndedNotice, setMatchEndedNotice] = useState<string | null>(null);
-  const [hosting, setHosting] = useState(true);
-  const [joiningHost, setJoiningHost] = useState<string | null>(null);
+
+  /** Remember a name for next time, wherever the player committed to it. */
+  const rememberPlayer = useCallback((player: PlayerSetupValues) => {
+    setSavedPlayers((current) => {
+      const two = current?.two ?? { username: 'Player 2', initials: 'P2' };
+      savePlayers(player, two);
+      return { one: player, two };
+    });
+  }, []);
+
+  const clearLocalMatch = useCallback(() => {
+    setState(null);
+    setMatch(null);
+  }, []);
+
+  // Everything about being connected to someone else. App keeps the board, the
+  // sound and the quit flow; this owns the lobby, the room and which of them
+  // is on screen.
+  const net = useOnlineMatch({
+    rememberPlayer,
+    onEnterMatch: primeAudio,
+    onMatchEnded: clearLocalMatch,
+  });
+  const { remote, online } = net;
+
   const [quitPhase, setQuitPhase] = useState<QuitPhase>('idle');
   const [shutdown, setShutdown] = useState<ShutdownOutcome | null>(null);
   // Forces a repaint while a clock runs. The clock itself is a balance plus a
@@ -417,114 +422,6 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [match?.bot, online, state?.currentPlayer, state?.status, drawnEdges]);
 
-  const createRoom = useCallback(
-    (player: PlayerSetupValues, options: MatchOptions) => {
-      primeAudio();
-      setSavedPlayers((current) => ({ one: player, two: current?.two ?? { username: 'Player 2', initials: 'P2' } }));
-      savePlayers(player, savedPlayers?.two ?? { username: 'Player 2', initials: 'P2' });
-      setMatchEndedNotice(null);
-      setOnline(true);
-      setHosting(true);
-      setJoiningHost(null);
-      remote.connect({
-        code: generateRoomCode(),
-        player,
-        create: true,
-        gridSize: options.gridSize,
-        timeControlMs: options.timeControlMs,
-        incrementMs: options.incrementMs,
-        visibility: options.visibility,
-      });
-    },
-    [remote],
-  );
-
-  const joinRoom = useCallback(
-    (code: string, player: PlayerSetupValues) => {
-      primeAudio();
-      setSavedPlayers((current) => ({ one: player, two: current?.two ?? { username: 'Player 2', initials: 'P2' } }));
-      savePlayers(player, savedPlayers?.two ?? { username: 'Player 2', initials: 'P2' });
-      setMatchEndedNotice(null);
-      setOnline(true);
-      setHosting(false);
-      remote.connect({ code, player, create: false });
-    },
-    [remote],
-  );
-
-  /**
-   * A rematch offer that expired. Both players are returned to the start —
-   * there is nothing left to wait for, and the alternative is a screen that
-   * never changes.
-   */
-  useEffect(() => {
-    if (!remote.rematchExpired) return;
-    setMatchEndedNotice('The other player did not answer — the match has ended.');
-    remote.disconnect();
-    setOnline(false);
-    setState(null);
-    setMatch(null);
-  }, [remote.rematchExpired, remote]);
-
-  // A join that landed. Without this the browse screen is still armed behind
-  // the game, and leaving it later drops the player onto a dead lobby.
-  useEffect(() => {
-    if (!remote.seat) return;
-    setBusyCode(null);
-    setBrowsing(false);
-    setLobbyNotice(null);
-    lobby.close();
-  }, [remote.seat, lobby]);
-
-  /**
-   * A join that started from the lobby and was refused. The row was a snapshot
-   * of something already gone, so put the player back in front of the list with
-   * a plain explanation rather than a dead-end error screen.
-   */
-  useEffect(() => {
-    if (!busyCode || !remote.failure) return;
-    setLobbyNotice(
-      remote.failure === 'room-full'
-        ? 'That game just filled — pick another.'
-        : 'That game is no longer open — pick another.',
-    );
-    setDeadCodes((current) => (current.includes(busyCode) ? current : [...current, busyCode]));
-    setBusyCode(null);
-    remote.disconnect();
-    setOnline(false);
-    setBrowsing(true);
-    lobby.open();
-  }, [busyCode, remote, lobby]);
-
-  const browseLobby = useCallback(
-    (player: PlayerSetupValues) => {
-      setBrowsePlayer(player);
-      setSavedPlayers((current) => ({
-        one: player,
-        two: current?.two ?? { username: 'Player 2', initials: 'P2' },
-      }));
-      setLobbyNotice(null);
-      setBrowsing(true);
-      lobby.open();
-    },
-    [lobby],
-  );
-
-  const joinFromLobby = useCallback(
-    (code: string, player: PlayerSetupValues, hostName: string) => {
-      // The row is a cache; the room decides. Hold it until we know which.
-      setBusyCode(code);
-      setJoiningHost(hostName);
-      joinRoom(code, player);
-    },
-    [joinRoom],
-  );
-
-  const leaveOnline = useCallback(() => {
-    remote.disconnect();
-    setOnline(false);
-  }, [remote]);
-
   const confirmQuit = useCallback(async () => {
     setQuitPhase('quitting');
     setShutdown(await requestShutdown());
@@ -595,26 +492,17 @@ export default function App() {
     </div>
   );
 
-  if (browsing && !remote.seat) {
+  if (net.browsing && !remote.seat) {
     return (
       <main className="app">
         <PublicLobby
-          games={lobby.games.filter((game) => !deadCodes.includes(game.code))}
-          status={lobby.status}
-          busyCode={busyCode}
-          notice={lobbyNotice}
-          onJoin={(code, hostName) => browsePlayer && joinFromLobby(code, browsePlayer, hostName)}
-          onStage={(options) => {
-            if (!browsePlayer) return;
-            // Being first in is fine — stage the game and wait right here.
-            setBrowsing(false);
-            lobby.close();
-            createRoom(browsePlayer, options);
-          }}
-          onBack={() => {
-            setBrowsing(false);
-            lobby.close();
-          }}
+          games={net.games}
+          status={net.lobbyStatus}
+          busyCode={net.busyCode}
+          notice={net.lobbyNotice}
+          onJoin={net.joinFromLobby}
+          onStage={net.stageFromLobby}
+          onBack={net.leaveLobby}
         />
       </main>
     );
@@ -626,9 +514,9 @@ export default function App() {
         <Lobby
           code={remote.code ?? '......'}
           status={remote.status}
-          onCancel={leaveOnline}
-          isHost={hosting}
-          hostName={joiningHost}
+          onCancel={net.leaveOnline}
+          isHost={net.hosting}
+          hostName={net.joiningHost}
           failure={remote.failure}
         />
       </main>
@@ -641,15 +529,15 @@ export default function App() {
         <PlayerSetup
           initialPlayers={savedPlayers}
           onStart={startGame}
-          onJoinRoom={joinRoom}
-          onBrowseLobby={browseLobby}
+          onJoinRoom={net.joinRoom}
+          onBrowseLobby={net.browseLobby}
           initialCode={linkedRoom}
           // Someone sent back from an online match belongs on the online tab,
           // not dropped into pass-and-play holding an explanation about a
           // player who is not there.
-          initialMode={browsePlayer || matchEndedNotice ? 'online' : undefined}
+          initialMode={net.browsePlayer || net.matchEndedNotice ? 'online' : undefined}
           joinError={
-            matchEndedNotice ??
+            net.matchEndedNotice ??
             (remote.failure ? (JOIN_ERRORS[remote.failure] ?? 'Could not join.') : null)
           }
         />
@@ -828,7 +716,7 @@ export default function App() {
           {/* On an untimed board their flag never falls, so without this the
               only way out of a game nobody is playing was to forfeit and take
               a recorded loss. Leaving is not the same thing as losing. */}
-          <button type="button" className="button button--ghost" onClick={leaveOnline}>
+          <button type="button" className="button button--ghost" onClick={net.leaveOnline}>
             Leave game
           </button>
         </p>
@@ -915,8 +803,8 @@ export default function App() {
             series: online ? remote.series : null,
           }}
           onPlayAgain={online ? remote.requestRematch : playAgain}
-          onNewGame={online ? leaveOnline : newGame}
-          onQuit={online ? leaveOnline : () => setQuitPhase('confirming')}
+          onNewGame={online ? net.leaveOnline : newGame}
+          onQuit={online ? net.leaveOnline : () => setQuitPhase('confirming')}
         />
       )}
 
