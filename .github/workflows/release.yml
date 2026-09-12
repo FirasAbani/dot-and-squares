@@ -1,0 +1,97 @@
+# Publish a GitHub Release when a version tag is pushed.
+#
+# The tag is the trigger, and release-manager pushes it only after a verified
+# Cloudflare deploy — so a Release here means "this is live", not "this built".
+# That ordering is deliberate: a Release pointing at code users cannot see is
+# worse than no Release at all.
+#
+# Deploying is NOT done here. Cloudflare credentials would have to live in this
+# repo's secrets, and a push to main would then reach players with no human in
+# the loop. The deploy stays local, in release-manager.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to publish a release for (e.g. v1.2.0)'
+        required: true
+
+permissions:
+  # The only write this workflow needs: creating the Release itself.
+  contents: write
+
+jobs:
+  release:
+    name: Verify and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          # Full history, so the notes below can diff against the previous tag.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # Re-verified here rather than trusted from CI: a tag can be pushed at any
+      # commit, including one that never went through a pull request.
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Package the build
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          tar -czf "dots-and-squares-${TAG}.tar.gz" -C dist .
+
+      # Every commit since the previous tag, which is the honest answer to
+      # "what changed" without a changelog file to keep in sync by hand.
+      - name: Collect the changes
+        id: notes
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          PREV="$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || echo '')"
+          {
+            echo 'body<<RELEASE_NOTES_EOF'
+            if [ -n "$PREV" ]; then
+              echo "### Changes since ${PREV}"
+              echo
+              git log --no-merges --pretty='- %s (%h)' "${PREV}..${TAG}"
+            else
+              echo '### First release'
+              echo
+              git log --no-merges --pretty='- %s (%h)' "${TAG}" | head -50
+            fi
+            echo
+            echo '---'
+            echo
+            echo 'Live at https://dots-and-squares.dots-and-squares.workers.dev'
+            echo
+            echo 'Deployed to Cloudflare before this tag was pushed; this Release records what went out.'
+            echo 'RELEASE_NOTES_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publish the Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: ${{ github.event.inputs.tag || github.ref_name }}
+          body: ${{ steps.notes.outputs.body }}
+          files: dots-and-squares-*.tar.gz
+          fail_on_unmatched_files: true

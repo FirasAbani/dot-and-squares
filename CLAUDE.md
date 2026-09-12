@@ -130,6 +130,34 @@ locally with no remote copy is the failure mode this rule exists to prevent.
 - Pushing is **not** deploying. `git push` puts the code on GitHub; players still see
   nothing until `npm run ship` — see the section above.
 
+## Releasing — two agents and a name convention
+
+Both agents live in `~/.claude/agents/`, **not** in this repo, so they work in every
+project. Convention: **agents that work together share a prefix** — type `release-` and
+you have the family.
+
+| Agent | Does | Calls |
+| --- | --- | --- |
+| `release-manager` | The one to ask for. Qualifies, pushes, deploys to Cloudflare, verifies, tags | `release-qualifier` |
+| `release-qualifier` | Verdict only — clean tree, pushed, typecheck, tests, build. Returns GO or NO-GO | — |
+
+Say "release this" and `release-manager` runs the whole order: **qualify → push → deploy
+→ verify → tag**. It refuses to deploy on a NO-GO, and it never edits source.
+
+Neither agent hardcodes this project. They read `package.json` and `wrangler.jsonc` and
+use whatever the project defines, preferring `npm run ship` over `npm run deploy` wherever
+it exists — because `ship` verifies that players actually got the build.
+
+**CI does not deploy.** [.github/workflows/ci.yml](.github/workflows/ci.yml) typechecks,
+tests and builds every push and PR on a clean checkout — which is the point, since this
+Mac has been building all day and CI has not. [release.yml](.github/workflows/release.yml)
+publishes a GitHub Release when a `v*` tag is pushed, re-running the full verification
+first because a tag can be pushed at any commit.
+
+Cloudflare credentials are deliberately **not** in GitHub secrets: with them, a push to
+main would reach players with no human in the loop. The deploy stays local, and the tag
+is pushed only after it is verified — so a Release means "this is live", not "this built".
+
 ## Gotchas
 
 - Vite dev returns `index.html` with **200** for unknown paths, so a `curl`

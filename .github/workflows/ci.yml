@@ -1,0 +1,60 @@
+# Build and test every push to main and every pull request.
+#
+# This is the check that runs on someone else's machine. The local hooks and the
+# release-qualifier agent both run on a Mac that has been building this project
+# all day; CI is a clean checkout that has not, which is what makes it worth
+# having. A dependency missing from package.json fails here and nowhere else.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # So a red build can be re-run without an empty commit.
+  workflow_dispatch:
+
+concurrency:
+  # A newer push makes an in-flight run irrelevant — except on main, where every
+  # commit's result is worth keeping.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  verify:
+    name: Typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # `ci`, not `install`: it installs exactly the lockfile and fails if
+      # package.json and package-lock.json disagree, which is the drift worth
+      # catching before a release rather than during one.
+      - name: Install
+        run: npm ci
+
+      # Both projects — the client and the Worker have separate tsconfigs, and
+      # only checking one lets the other rot.
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      # Kept so a failed release can be compared against what CI actually built.
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ github.sha }}
+          path: dist/
+          retention-days: 7
