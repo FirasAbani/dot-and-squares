@@ -116,19 +116,32 @@ After editing [scripts/launcher.sh](scripts/launcher.sh), copy it into the bundl
 
 Remote is `origin` → https://github.com/FirasAbani/dot-and-squares.git, branch `main`.
 
-**A commit that is not pushed does not exist off this Mac.** Commit *and* push at each
-logical milestone, in the same breath — `git push origin main` right after the commit,
-not batched up for later and not left for the user to remember. Work accumulating
-locally with no remote copy is the failure mode this rule exists to prevent.
+**Push `main`. Never push a work branch.**
 
-- Push after every commit. If several commits land in one turn, one push at the end is
-  fine; ending the turn with anything unpushed is not.
+Work branches are local. They live in worktrees, they get merged into `main` when they
+are finished, and `main` is the only thing that reaches GitHub. A remote full of
+half-finished branches is a remote nobody can read, and every one of them is a decision
+someone has to make later about whether it is still wanted.
+
+- **Only `git push origin main`.** No `git push -u origin <branch>`, for any branch, ever
+  — not to back work up, not to open a pull request, not "just so it exists somewhere".
+- Push `main` after every commit that lands on it. Ending a turn with `main` unpushed is
+  not acceptable; ending a turn with local branches unpushed is the normal state.
 - Report it plainly — say the commit is pushed, or say why it is not.
 - If the push is rejected because the remote moved, `git pull --rebase origin main`,
   re-run `npm test`, then push. Never force-push `main`.
 - Never push work that fails `npm test` or `npm run typecheck`.
 - Pushing is **not** deploying. `git push` puts the code on GitHub; players still see
   nothing until `npm run ship` — see the section above.
+
+Two consequences, both deliberate:
+
+- **Unmerged work exists only on this Mac.** That is the accepted cost. Finish a branch
+  and merge it rather than leaving it open as a backup.
+- **CI runs after a merge, not before one.** With no pushed branches there are no pull
+  requests, so [ci.yml](.github/workflows/ci.yml) only fires on `main`. Everything must
+  therefore pass locally *before* the merge — `npm test` and `npm run typecheck` in the
+  worktree are the real gate, and CI is the clean-checkout second opinion.
 
 ## Releasing — two agents and a name convention
 
