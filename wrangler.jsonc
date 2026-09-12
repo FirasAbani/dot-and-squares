@@ -17,6 +17,14 @@
       { "name": "LOBBY", "class_name": "LobbyRoom" }
     ]
   },
+  // Workers Logs. Without this a bug a real player hits inside a Durable Object
+  // leaves no trace anywhere — the room is the only place that knows, and it is
+  // gone by the time anyone asks. Sampling at 1 (100%) because this game's whole
+  // traffic is a handful of matches; there is nothing here worth sampling down.
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
   // new_sqlite_classes, not new_classes: the free plan only offers the SQLite
   // storage backend, and a new_classes migration is rejected at deploy.
   "migrations": [

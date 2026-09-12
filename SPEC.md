@@ -421,8 +421,15 @@ softer alternatives because the board is the content and the chrome should not c
    "Taking a seat in {host}'s game…" — with no room code and no Copy link, since a joiner
    has no invite of their own to share and was previously shown the host's code by mistake.
 4. **Board** — the SVG grid, scoreboard, clocks, turn banner, chain badge, notices.
-4. **Game over** — result, achievement eyebrow, scores, series tally, rematch, back to
-   setup, quit.
+4. **Game over** — result, achievement eyebrow, scores, series tally, rematch, **Main
+   Menu**, quit.
+5. **Something went wrong** — the error-boundary fallback, rendered in place of the whole
+   app when any render below it throws. Without it the player gets a white tab: no
+   explanation, no way back, and no sign anything is wrong beyond an empty page. It offers
+   **Back to Menu** and **Reload**. Back to Menu *remounts* the tree rather than clearing a
+   flag — re-rendering the state that just threw only throws again — which for an online
+   game drops the socket too, correct since that match is over regardless. The error goes
+   to the browser console and nowhere else; this game collects nothing about its players.
 
 ### 7.3 Board rendering and hit-testing
 
@@ -605,6 +612,11 @@ against the live page (Vite hashes by content, so the asset name is the build id
 version stamp to keep in sync) and probes `/api/lobby` as a capability check. The launcher
 runs it at every launch and offers to deploy when the site is behind; "could not tell"
 (offline, or nothing built) never interrupts.
+
+**Workers Logs are on** — `observability.enabled` in `wrangler.jsonc`, sampling at 1 (100%).
+A bug a real player hits inside a Durable Object otherwise leaves no trace anywhere: the room
+is the only thing that saw it, and it is gone by the time anyone thinks to ask. This game's
+entire traffic is a handful of matches, so there is nothing worth sampling down.
 
  One Worker serves the static SPA
 and the multiplayer; the SPA fallback handles client routing; `/api/*` reaches the Worker
