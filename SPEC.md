@@ -543,6 +543,50 @@ button's action is unreachable in the current state, do not draw it.
 
 ---
 
+### 7.8 Defending a game in progress — INVARIANT
+
+A QA simulation played the live site as two people rather than as its authors, and the
+theme underneath most of what it found was that nothing defended a match. Four separate
+ways to lose one, none of them reported by a console error:
+
+- **Leaving is confirmed whenever there is something to lose.** On a phone the control
+  sits in the same row as Sound on, right under the board; one mis-tap cost the match with
+  no prompt and no undo — the only destructive action in the app that was not confirmed.
+  With nothing in progress it goes straight back, because there is nothing to protect.
+- **The confirm dialog exists in every build.** It used to render `null` unless the server
+  was stoppable, while the Game over screen's Quit set the phase regardless — so in
+  production the overlay vanished and left a finished board with no buttons, no dialog and
+  no links, one click from the end of every game. One `quitAction`, decided once, is the
+  real fix: two call sites each deciding what Quit means is how one of them forgot.
+- **A reload is guarded by `beforeunload`,** registered only while a game is running. A
+  page that always asks is a page people learn to dismiss.
+- **Entering a game pushes one history entry.** Without one, Back — the reflex for
+  "previous screen" — consumed the entry that brought the player to the site and left it
+  entirely, taking the match along. One entry per match, not one per move.
+
+**The victory sweep's timer lives in a ref and is never cleared by its effect's cleanup.**
+It was, and that stranded the winner of an online game on a finished board with no result
+and nothing to click: any later `state` broadcast gives `activeState` a new identity, the
+effect re-runs, React runs the previous cleanup and cancels the timer, and the `endedRef`
+early return never re-arms it — so `celebrating` stays true and the game over screen,
+gated on it being false, never appears. A test pins this, and its fixture asserts a
+decisive board-complete win, because filling a 3x3's edges in natural order draws 2-2 and
+a draw runs no sweep at all — a fixture built that way tests nothing while appearing to.
+
+**A room code that cannot exist says so.** The alphabet omits 0, 1, I, L and O precisely
+because people confuse them, and the field accepted them and then did nothing: no lookup,
+no error, not even "looking up that game", a screen identical to an empty one. The single
+case the alphabet exists to protect against was the only one with no feedback. Both QA
+players found this independently, which is the strongest signal a review of this kind
+produces.
+
+**Two players cannot share initials in pass-and-play.** Initials are the identity chip on
+the board and the scoreboard, so sharing them leaves colour and dash pattern as the only
+way to tell whose squares are whose. Online opponents are on their own screens, so it is
+allowed there.
+
+---
+
 ## 8. Local development
 
 - Dev server on port **5173**, `--strictPort`.

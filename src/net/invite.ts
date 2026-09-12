@@ -22,6 +22,11 @@ export function inviteText(hostName?: string | null): string {
 
 export type InviteOutcome = 'shared' | 'copied' | 'dismissed' | 'failed';
 
+/** The text and link, for a caller that has to offer them by hand. */
+export function inviteMessage(code: string, hostName?: string | null): string {
+  return `${inviteText(hostName)}\n${shareLink(code)}`;
+}
+
 /**
  * Offers the invitation through the device share sheet, falling back to the
  * clipboard where there is none (most desktop browsers).
@@ -37,6 +42,9 @@ export async function offerInvite(
   const url = shareLink(code);
   const text = inviteText(hostName);
 
+  // Desktop browsers have no share sheet at all, which is the common case and
+  // not a failure. The clipboard is the useful path there: the host is about to
+  // paste this into a chat, not read it out to someone in the room.
   if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
     try {
       await navigator.share({ title: 'Dots & Squares', text, url });
@@ -52,7 +60,10 @@ export async function offerInvite(
     await navigator.clipboard.writeText(`${text}\n${url}`);
     return 'copied';
   } catch {
-    // Clipboard access can be refused. The code is on screen to read out.
+    // Both refused. The caller must then show the link itself — telling the
+    // player to "read out the code" blames the share sheet for something the
+    // clipboard failed at, and is useless advice for inviting someone who is
+    // not in the room with you.
     return 'failed';
   }
 }

@@ -4,7 +4,7 @@ import { GameOverScreen, type MatchHighlights } from './components/GameOverScree
 import { Lobby } from './components/Lobby';
 import { PublicLobby } from './components/PublicLobby';
 import { useLobbyFeed } from './net/useLobbyFeed';
-import { PlayerSetup, type MatchOptions } from './components/PlayerSetup';
+import { PlayerSetup, type MatchOptions, type SetupMode } from './components/PlayerSetup';
 import { generateRoomCode } from './net/roomCode';
 import { useRemoteSession } from './net/useRemoteSession';
 import { QuitScreen } from './components/QuitScreen';
@@ -147,6 +147,7 @@ export default function App() {
       primeAudio();
       setSavedPlayers({ one: playerOne, two: playerTwo });
       savePlayers(playerOne, playerTwo);
+      setLastMode(options.botDifficulty ? 'computer' : 'local');
       setMatch({ playerOne, playerTwo, options, bot: options.botDifficulty ?? null });
       setState(
         startClock(
@@ -252,11 +253,28 @@ export default function App() {
     lastSeenRef.current = { edges: drawn, player: activeState.currentPlayer };
   }, [activeState, chain]);
 
+  /**
+   * The mode last played, so leaving a game returns to that tab.
+   *
+   * Leaving a computer game used to land on Pass & Play with a Player 2 form to
+   * fill in, so playing the computer twice meant re-picking the mode and the
+   * difficulty every time.
+   */
+  const [lastMode, setLastMode] = useState<SetupMode | null>(null);
+
+  /** Read by the reload guard, which is registered above where it is computed. */
+  const gameInProgressRef = useRef(false);
+
   // A sting on the end screen, once.
   const endedRef = useRef(false);
+  const sweepRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!activeState || activeState.status !== 'finished') {
       endedRef.current = false;
+      if (sweepRef.current) {
+        clearTimeout(sweepRef.current);
+        sweepRef.current = null;
+      }
       setCelebrating(false);
       highlightsRef.current = { peakChain: { p1: 0, p2: 0 }, behindBy: { p1: 0, p2: 0 } };
       return;
@@ -276,8 +294,21 @@ export default function App() {
       const owned = Object.values(activeState.squares).filter((sq) => sq.owner === winner).length;
       setCelebrating(true);
       playVictorySweep(owned);
-      const timer = setTimeout(() => setCelebrating(false), 900);
-      return () => clearTimeout(timer);
+      /*
+       * The timer is held in a ref, NOT cleared by this effect's cleanup.
+       *
+       * It used to be, and that stranded the joiner of an online game on a
+       * finished board with no result and no way forward. Any message arriving
+       * after the final state — a presence update, a series update — gives
+       * `remote.state` a new identity, the effect re-runs, React runs the
+       * previous cleanup and cancels the sweep timer, and the early return on
+       * `endedRef` means it is never re-armed. `celebrating` stays true for
+       * ever, and the game over screen is gated on it being false. The host saw
+       * the result because nothing arrived after their own final move.
+       */
+      if (sweepRef.current) clearTimeout(sweepRef.current);
+      sweepRef.current = setTimeout(() => setCelebrating(false), 900);
+      return;
     }
     if (lost) playDefeat();
     else playVictory();
@@ -525,6 +556,52 @@ export default function App() {
     setOnline(false);
   }, [remote]);
 
+  /**
+   * A reload used to destroy a game in progress in silence — no prompt, no
+   * resume, and a setup screen reset to its defaults. The browser's own
+   * "leave site?" prompt is the only thing that can interrupt a reload, so
+   * that is what guards it. Registered only while a game is actually running,
+   * because a page that always asks is a page people learn to dismiss.
+   */
+  useEffect(() => {
+    if (!gameInProgressRef.current) return;
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      // Legacy form, still required by some browsers to trigger the prompt.
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  });
+
+  /** Confirmed "leave" in a deployed build: no server to stop, just go. */
+  const leaveForMenu = useCallback(() => {
+    setQuitPhase('idle');
+    if (online) leaveOnline();
+    newGame();
+  }, [online, leaveOnline, newGame]);
+
+  /**
+   * Back must not leave the site.
+   *
+   * The app pushed no history entries of its own, so setup, board and game over
+   * were all one entry and Back — the reflex for "previous screen" — walked
+   * straight off the site, taking the match with it. Entering a game now pushes
+   * one entry, and popping it returns to the menu instead.
+   */
+  useEffect(() => {
+    if (!activeState) return;
+    history.pushState({ dsGame: true }, '');
+    const onPop = () => {
+      if (online) leaveOnline();
+      newGame();
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+    // Deliberately keyed on *having* a game, not on its contents: one entry per
+    // match, not one per move.
+  }, [activeState !== null, online, leaveOnline, newGame]);
+
   const confirmQuit = useCallback(async () => {
     setQuitPhase('quitting');
     setShutdown(await requestShutdown());
@@ -556,7 +633,19 @@ export default function App() {
    * condition — it set `quitPhase` in production, where the confirm overlay
    * renders nothing, so the dialog vanished and left a dead screen behind it.
    */
-  const quitAction = stoppable ? () => setQuitPhase('confirming') : newGame;
+  /**
+   * Leaving is confirmed whenever there is a game to lose.
+   *
+   * On a phone this control sits in the same row as Sound on, right under the
+   * board, and a single mis-tap used to throw the match away with no prompt and
+   * no undo — the only destructive action in the app that was not confirmed.
+   * With nothing in progress there is nothing to protect, so it goes straight
+   * back to the menu.
+   */
+  const gameInProgress = activeState !== null && activeState.status === 'playing';
+  gameInProgressRef.current = gameInProgress;
+  const quitAction =
+    stoppable || gameInProgress ? () => setQuitPhase('confirming') : newGame;
 
   const quitButton = (
     <button
@@ -568,17 +657,25 @@ export default function App() {
     </button>
   );
 
-  const quitDialog = quitPhase === 'idle' || !stoppable ? null : (
+  const quitDialog = quitPhase === 'idle' ? null : (
     <div className="overlay" role="dialog" aria-modal="true" aria-label="Quit game">
       <div className="panel overlay__panel">
-        <p className="overlay__eyebrow">Quit</p>
-        <h2 className="overlay__title">Stop the game server?</h2>
+        <p className="overlay__eyebrow">{stoppable ? 'Quit' : 'Leave game'}</p>
+        <h2 className="overlay__title">
+          {stoppable ? 'Stop the game server?' : 'Leave this game?'}
+        </h2>
         <p className="quit-confirm__body">
-          {state
-            ? 'This ends the match in progress and shuts the server down. '
-            : 'This closes the game and shuts the server down. '}
-          Nothing will be running until someone starts it again with{' '}
-          <code>npm run dev</code>.
+          {stoppable ? (
+            <>
+              {state
+                ? 'This ends the match in progress and shuts the server down. '
+                : 'This closes the game and shuts the server down. '}
+              Nothing will be running until someone starts it again with{' '}
+              <code>npm run dev</code>.
+            </>
+          ) : (
+            'The game in progress will be lost and the scores go with it. There is no way back to this board.'
+          )}
         </p>
         {/* Cancel comes first and holds focus: for an irreversible action the
             safe choice should be the one reached by reflex, and the dangerous
@@ -596,10 +693,14 @@ export default function App() {
           <button
             type="button"
             className="button button--danger"
-            onClick={confirmQuit}
+            onClick={stoppable ? confirmQuit : leaveForMenu}
             disabled={quitPhase === 'quitting'}
           >
-            {quitPhase === 'quitting' ? 'Shutting down…' : 'Quit & Stop Server'}
+            {stoppable
+              ? quitPhase === 'quitting'
+                ? 'Shutting down…'
+                : 'Quit & Stop Server'
+              : 'Leave Game'}
           </button>
         </div>
       </div>
@@ -658,7 +759,9 @@ export default function App() {
           // Someone sent back from an online match belongs on the online tab,
           // not dropped into pass-and-play holding an explanation about a
           // player who is not there.
-          initialMode={browsePlayer || matchEndedNotice ? 'online' : undefined}
+          initialMode={
+            browsePlayer || matchEndedNotice ? 'online' : (lastMode ?? undefined)
+          }
           joinError={
             matchEndedNotice ??
             (remote.failure ? (JOIN_ERRORS[remote.failure] ?? 'Could not join.') : null)

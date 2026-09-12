@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import * as quitBehaviour from './quit-behaviour';
@@ -411,7 +411,14 @@ describe('quitting a deployed build', () => {
     vi.unstubAllGlobals();
   });
 
-  it('offers Leave Game in a game, where there is something to leave', () => {
+  /**
+   * This used to assert that Leave Game took effect immediately. QA found that
+   * on a phone the control sits in the same row as Sound on, directly under the
+   * board, and one mis-tap threw the match away with no prompt and no undo —
+   * the only destructive action in the app that was not confirmed. So the
+   * intent changed: a game in progress is now defended.
+   */
+  it('confirms Leave Game while a match is in progress, and never asks to stop a server', () => {
     // Vitest pins import.meta.env.DEV to true, so the production branch is
     // reached by stubbing the helper rather than the env.
     vi.spyOn(quitBehaviour, 'canStopServer').mockReturnValue(false);
@@ -423,8 +430,21 @@ describe('quitting a deployed build', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Leave Game' }));
 
-    // No confirmation, no shutdown request — it just returns to setup.
+    // A confirmation, worded for leaving — not for shutting a server down.
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.textContent).toMatch(/leave this game/i);
+    expect(dialog.textContent).not.toMatch(/npm run dev|server/i);
+
+    // Cancel keeps the board.
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.querySelector('[data-edge-id]')).toBeTruthy();
+
+    // Confirming returns to setup, and still never asks the server anything.
+    fireEvent.click(screen.getByRole('button', { name: 'Leave Game' }));
+    fireEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Leave Game' }),
+    );
     expect(fetchMock).not.toHaveBeenCalled();
     expect(startButton()).toBeTruthy();
   });

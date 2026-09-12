@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { offerInvite, type InviteOutcome } from '../net/invite';
+import { inviteMessage, offerInvite, type InviteOutcome } from '../net/invite';
 import type { JoinFailure } from '../shared/protocol';
 import type { ConnectionStatus } from '../net/useRemoteSession';
 
@@ -110,10 +110,24 @@ export function Lobby({
         </button>
       </div>
 
+      {/* Neither the share sheet nor the clipboard worked, so hand over the
+          invitation itself rather than explaining which mechanism failed. The
+          player still has someone to invite; a selected textarea is something
+          they can act on. */}
       {isHost && invited === 'failed' && (
-        <p className="setup__hint" role="alert">
-          Could not open the share sheet — read out the code above instead.
-        </p>
+        <div className="field" role="group" aria-label="Invitation to copy">
+          <p className="setup__hint" role="alert">
+            Copying did not work here — select this and send it yourself:
+          </p>
+          <textarea
+            className="field__initials lobby__invite-text"
+            readOnly
+            rows={2}
+            value={inviteMessage(code, hostName ?? undefined)}
+            onFocus={(event) => event.currentTarget.select()}
+            aria-label="Invitation text and link"
+          />
+        </div>
       )}
 
       {failed ? (

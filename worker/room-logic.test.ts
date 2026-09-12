@@ -778,3 +778,40 @@ describe('a rematch nobody answers', () => {
     expect(timedOut.effects).toEqual([{ to: 'all', msg: { t: 'rematch-timeout' } }]);
   });
 });
+
+/**
+ * A host who cancels the waiting screen leaves their seat behind, because a
+ * seat is claimed and never released. The room then advertised itself for ever
+ * as joinable — "You have been invited / Accept & Play" for a game nobody was
+ * waiting in.
+ */
+describe('a room whose host has gone before a game started', () => {
+  it('stops reporting itself as a room to join', () => {
+    const first = seat(emptyRoom('ABC234', 0), ada, true);
+    expect(roomInfo(first.room).exists).toBe(true);
+
+    const gone = reduceRoom(first.room, { k: 'disconnect', seat: 'p1', now: 2000 });
+    expect(roomInfo(gone.room).exists).toBe(false);
+  });
+
+  /**
+   * A match in progress must still report itself, or a player reconnecting
+   * mid-game would be told their own game does not exist — which is the bug
+   * that was just fixed on the client and must not be reintroduced here.
+   */
+  it('keeps reporting a game in progress, even with nobody connected', () => {
+    const room = started();
+    const p1Gone = reduceRoom(room, { k: 'disconnect', seat: 'p1', now: 2000 });
+    const bothGone = reduceRoom(p1Gone.room, { k: 'disconnect', seat: 'p2', now: 2100 });
+
+    expect(bothGone.room.game).not.toBeNull();
+    expect(roomInfo(bothGone.room).exists).toBe(true);
+    expect(roomInfo(bothGone.room).full).toBe(true);
+  });
+
+  it('still reports a staged room while its host is connected', () => {
+    const first = seat(emptyRoom('ABC234', 0), ada, true);
+    expect(roomInfo(first.room).exists).toBe(true);
+    expect(roomInfo(first.room).full).toBe(false);
+  });
+});

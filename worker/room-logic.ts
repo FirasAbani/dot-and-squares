@@ -121,8 +121,25 @@ export function emptyRoom(code: string, now: number): RoomState {
 /** A read-only summary for a player deciding whether to join. */
 export function roomInfo(room: RoomState): RoomInfo {
   const host = room.meta.seats.p1 ?? room.meta.seats.p2;
+  /*
+   * A room whose host has gone before a game started is not a room to offer.
+   *
+   * A seat is claimed, not released, so a host who cancels the waiting screen
+   * leaves their seat behind — and this said `exists: true` for ever after,
+   * so typing that code showed "You have been invited / Accept & Play" for a
+   * game nobody was waiting in. A dead end dressed as an invitation.
+   *
+   * The same rule the lobby already applies: `listingOf` returns null when the
+   * host is not connected, because a host who has dropped is not someone to
+   * send a stranger to. This makes the code path agree with the listing path.
+   *
+   * Deliberately limited to rooms with no game: a match in progress must still
+   * report itself, or a player reconnecting mid-game would be told their own
+   * game does not exist.
+   */
+  const abandoned = room.game === null && SEATS.every((seat) => !room.connected[seat]);
   return {
-    exists: host !== null,
+    exists: host !== null && !abandoned,
     full: SEATS.every((seat) => room.meta.seats[seat] !== null),
     inProgress: room.game !== null && room.game.status === 'playing',
     visibility: visibilityOf(room),
