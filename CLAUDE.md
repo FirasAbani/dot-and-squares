@@ -112,6 +112,24 @@ After editing [scripts/launcher.sh](scripts/launcher.sh), copy it into the bundl
 (`cp scripts/launcher.sh ~/Desktop/"Dots & Squares.app"/Contents/MacOS/launch`) or rerun
 `npm run make-icon`; the app holds its own copy.
 
+## Source control — push every commit
+
+Remote is `origin` → https://github.com/FirasAbani/dot-and-squares.git, branch `main`.
+
+**A commit that is not pushed does not exist off this Mac.** Commit *and* push at each
+logical milestone, in the same breath — `git push origin main` right after the commit,
+not batched up for later and not left for the user to remember. Work accumulating
+locally with no remote copy is the failure mode this rule exists to prevent.
+
+- Push after every commit. If several commits land in one turn, one push at the end is
+  fine; ending the turn with anything unpushed is not.
+- Report it plainly — say the commit is pushed, or say why it is not.
+- If the push is rejected because the remote moved, `git pull --rebase origin main`,
+  re-run `npm test`, then push. Never force-push `main`.
+- Never push work that fails `npm test` or `npm run typecheck`.
+- Pushing is **not** deploying. `git push` puts the code on GitHub; players still see
+  nothing until `npm run ship` — see the section above.
+
 ## Gotchas
 
 - Vite dev returns `index.html` with **200** for unknown paths, so a `curl`
