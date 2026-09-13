@@ -10,7 +10,7 @@
  */
 import { readFile } from 'node:fs/promises';
 
-export const LIVE = process.env.LIVE_URL ?? 'https://dots-and-squares.dots-and-squares.workers.dev';
+export const LIVE = process.env.LIVE_URL ?? 'https://dots-and-squares.firasabani.workers.dev';
 
 const assetsOf = (html) => [...html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map((m) => m[1]).sort();
 

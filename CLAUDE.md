@@ -88,7 +88,7 @@ commands (it drives the wrangler port and the Vite proxy target alike).
 ## Shipping — the desktop app shows the DEPLOYED build
 
 [scripts/launcher.sh](scripts/launcher.sh) opens
-`https://dots-and-squares.dots-and-squares.workers.dev`, deliberately: a locally served
+`https://dots-and-squares.firasabani.workers.dev`, deliberately: a locally served
 game hands out a `localhost` invite link nobody else can open, so pointing at production
 is what makes "send this link" work.
 

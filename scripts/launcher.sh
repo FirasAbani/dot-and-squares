@@ -7,7 +7,7 @@
 # Pointing straight at the deployed site is what makes "send this link to the
 # other player" actually work.
 
-LIVE="https://dots-and-squares.dots-and-squares.workers.dev"
+LIVE="https://dots-and-squares.firasabani.workers.dev"
 PROJECT="$HOME/Code/Application"
 PORT=8787
 

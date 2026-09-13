@@ -81,7 +81,7 @@ jobs:
             echo
             echo '---'
             echo
-            echo 'Live at https://dots-and-squares.dots-and-squares.workers.dev'
+            echo 'Live at https://dots-and-squares.firasabani.workers.dev'
             echo
             echo 'Deployed to Cloudflare before this tag was pushed; this Release records what went out.'
             echo 'RELEASE_NOTES_EOF'

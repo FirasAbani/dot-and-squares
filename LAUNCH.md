@@ -5,7 +5,7 @@ Everything you need to get the game running again after a restart.
 ## The desktop icon (easiest)
 
 Double-click **Dots & Squares** on the Desktop. It opens the deployed game at
-https://dots-and-squares.dots-and-squares.workers.dev — nothing runs on your Mac, and
+https://dots-and-squares.firasabani.workers.dev — nothing runs on your Mac, and
 the invite link you share is a real public URL the other player can open.
 
 **It deliberately does not start a local server.** The invite link is built from the
